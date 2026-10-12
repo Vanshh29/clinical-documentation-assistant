@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Build context is the repository root:  docker build -f apps/api/Dockerfile .
-FROM python:3.12.7-slim-bookworm AS build
+FROM python:3.12.15-slim-bookworm AS build
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN python -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH
@@ -9,7 +9,7 @@ COPY apps/api/pyproject.toml apps/api/pyproject.toml
 COPY apps/api/src apps/api/src
 RUN pip install "./apps/api[otel]"
 
-FROM python:3.12.7-slim-bookworm
+FROM python:3.12.15-slim-bookworm
 ENV PATH=/opt/venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin app
 COPY --from=build /opt/venv /opt/venv

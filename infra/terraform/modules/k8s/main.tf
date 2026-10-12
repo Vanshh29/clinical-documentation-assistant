@@ -40,8 +40,9 @@ resource "aws_eks_cluster" "this" {
   vpc_config {
     subnet_ids              = concat(var.private_subnet_ids, var.public_subnet_ids)
     endpoint_private_access = true
-    endpoint_public_access  = true
-    public_access_cidrs     = var.api_allowed_cidrs
+    # Private by default. Public access is opt-in and limited to the addresses in api_allowed_cidrs.
+    endpoint_public_access = var.endpoint_public_access
+    public_access_cidrs    = var.endpoint_public_access ? var.api_allowed_cidrs : null
   }
 
   encryption_config {
@@ -57,6 +58,13 @@ resource "aws_eks_cluster" "this" {
   }
 
   enabled_cluster_log_types = ["api", "audit", "authenticator"]
+
+  lifecycle {
+    precondition {
+      condition     = !var.endpoint_public_access || length(var.api_allowed_cidrs) > 0
+      error_message = "Public API access needs at least one address in api_allowed_cidrs."
+    }
+  }
 
   depends_on = [aws_iam_role_policy_attachment.cluster, aws_cloudwatch_log_group.cluster]
 }

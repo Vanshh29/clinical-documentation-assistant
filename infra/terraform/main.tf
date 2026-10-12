@@ -23,18 +23,19 @@ module "network" {
 }
 
 module "k8s" {
-  source               = "./modules/k8s"
-  cluster_name         = local.name
-  kubernetes_version   = var.kubernetes_version
-  private_subnet_ids   = module.network.private_subnet_ids
-  public_subnet_ids    = module.network.public_subnet_ids
-  api_allowed_cidrs    = var.api_allowed_cidrs
-  admin_principal_arns = var.admin_principal_arns
-  node_instance_types  = var.node_instance_types
-  node_capacity_type   = var.node_capacity_type
-  node_desired_size    = var.node_desired_size
-  node_min_size        = var.node_min_size
-  node_max_size        = var.node_max_size
+  source                 = "./modules/k8s"
+  cluster_name           = local.name
+  kubernetes_version     = var.kubernetes_version
+  private_subnet_ids     = module.network.private_subnet_ids
+  public_subnet_ids      = module.network.public_subnet_ids
+  endpoint_public_access = var.endpoint_public_access
+  api_allowed_cidrs      = var.api_allowed_cidrs
+  admin_principal_arns   = var.admin_principal_arns
+  node_instance_types    = var.node_instance_types
+  node_capacity_type     = var.node_capacity_type
+  node_desired_size      = var.node_desired_size
+  node_min_size          = var.node_min_size
+  node_max_size          = var.node_max_size
 }
 
 module "db" {

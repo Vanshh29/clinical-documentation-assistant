@@ -33,10 +33,16 @@ variable "kubernetes_version" {
   default = "1.30"
 }
 
+variable "endpoint_public_access" {
+  description = "Expose the Kubernetes API on the internet, limited to api_allowed_cidrs. Off by default."
+  type        = bool
+  default     = false
+}
+
 variable "api_allowed_cidrs" {
-  description = "CIDRs allowed to reach the public Kubernetes API. Restrict to your network."
+  description = "Addresses allowed to reach the public Kubernetes API (only used when endpoint_public_access is true). 0.0.0.0/0 is rejected."
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+  default     = []
 }
 
 variable "admin_principal_arns" {

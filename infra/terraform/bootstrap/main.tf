@@ -37,12 +37,21 @@ resource "aws_s3_bucket_versioning" "state" {
   }
 }
 
+# A customer-managed key (rotated yearly) so access to state can be controlled and audited separately.
+resource "aws_kms_key" "state" {
+  description             = "${var.name_prefix} Terraform state"
+  enable_key_rotation     = true
+  deletion_window_in_days = 30
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "state" {
   bucket = aws_s3_bucket.state.id
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "aws:kms"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.state.arn
     }
+    bucket_key_enabled = true
   }
 }
 
@@ -66,6 +75,11 @@ resource "aws_dynamodb_table" "lock" {
 
   point_in_time_recovery {
     enabled = true
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.state.arn
   }
 }
 

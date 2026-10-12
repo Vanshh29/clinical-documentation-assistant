@@ -16,10 +16,20 @@ variable "public_subnet_ids" {
   type = list(string)
 }
 
+variable "endpoint_public_access" {
+  description = "Expose the Kubernetes API on the internet, limited to api_allowed_cidrs. Off by default: reach a private endpoint through a VPN or bastion."
+  type        = bool
+  default     = false
+}
+
 variable "api_allowed_cidrs" {
-  description = "CIDRs allowed to reach the public Kubernetes API endpoint. Restrict this to your office/VPN."
+  description = "Addresses allowed to reach the public Kubernetes API endpoint (only used when endpoint_public_access is true)."
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+  default     = []
+  validation {
+    condition     = !contains(var.api_allowed_cidrs, "0.0.0.0/0")
+    error_message = "0.0.0.0/0 would open the Kubernetes API to the whole internet. List specific addresses."
+  }
 }
 
 variable "admin_principal_arns" {

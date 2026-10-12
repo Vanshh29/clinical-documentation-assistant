@@ -63,12 +63,9 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
       - name: Scan before pushing
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          image-ref: ${{ vars.ECR_REGISTRY }}/cda-${{ matrix.component }}:${{ env.TAG }}
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: "1"
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.57.0 image \
+            --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 ${{ vars.ECR_REGISTRY }}/cda-${{ matrix.component }}:${{ env.TAG }}
       - name: Push (tags are immutable in ECR)
         run: docker push "${{ vars.ECR_REGISTRY }}/cda-${{ matrix.component }}:${{ env.TAG }}"
 

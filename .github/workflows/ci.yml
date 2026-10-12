@@ -233,26 +233,18 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
       - name: Scan image (fails on fixable HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          image-ref: cda-${{ matrix.component }}:ci
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: "1"
-          vuln-type: os,library
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.57.0 image \
+            --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 cda-${{ matrix.component }}:ci
 
   config-scan:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Scan Dockerfiles, Terraform and Kubernetes config for misconfigurations
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          scan-type: config
-          scan-ref: .
-          severity: HIGH,CRITICAL
-          exit-code: "1"
-          skip-dirs: .terraform,node_modules,.venv
+        run: |
+          docker run --rm -v "$PWD":/work aquasec/trivy:0.57.0 config --severity HIGH,CRITICAL --exit-code 1 \
+            --skip-dirs .terraform --skip-dirs node_modules --skip-dirs .venv /work
 
   e2e:
     runs-on: ubuntu-24.04

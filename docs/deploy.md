@@ -62,7 +62,7 @@ Costs money while it runs: an EKS control plane, NAT gateway, worker nodes and a
    cd infra/terraform/bootstrap && terraform init && terraform apply
    ```
    Note the `state_bucket` and `lock_table` outputs.
-2. **Configure.** Copy `infra/terraform/environments/dev.backend.hcl.example` to `dev.backend.hcl` (git-ignored) and fill it in. In `dev.tfvars` set `github_repository`, `state_bucket`, `lock_table`, and restrict `api_allowed_cidrs` to your network.
+2. **Configure.** Copy `infra/terraform/environments/dev.backend.hcl.example` to `dev.backend.hcl` (git-ignored) and fill it in. In `dev.tfvars` set `github_repository`, `state_bucket` and `lock_table`. The Kubernetes API is **private by default**. Dev opts in to public access limited to your own address: replace the example in `api_allowed_cidrs` with your public IP as `x.x.x.x/32` (`0.0.0.0/0` is rejected). Production keeps the API private; reach it through a VPN or a bastion in the VPC.
 3. **Create the infrastructure.**
    ```bash
    cd infra/terraform

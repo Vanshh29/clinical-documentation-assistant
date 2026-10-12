@@ -24,6 +24,7 @@ Demo only. Not a medical device. Not for real patient data. Method: STRIDE over 
 | **E**levation of privilege | Admin or clinician exceeding their role; container breakout | Roles enforced per route; admins see aggregates only; pods run as non-root with a read-only filesystem, no capabilities and a default seccomp profile; default-deny network policies; narrowly scoped cloud roles; CI uses short-lived OIDC credentials | Network policy needs a CNI that enforces it; cluster add-ons are outside this repository |
 
 ## Supply chain and operations
+The Kubernetes API endpoint is private by default; public access is opt-in, needs an explicit address list, and `0.0.0.0/0` is rejected by the Terraform variable validation. Base images are kept current: the first CI scan failed on fixable HIGH and CRITICAL findings in months-old base images, and the build now fails on any such finding.
 Pinned base images and immutable image tags; dependency audits, image and configuration scans, and secret scanning in CI; Dependabot. Terraform state is encrypted and locked. Residual: GitHub Actions are pinned by version tag, not commit hash; the model service is a third party whose retention policy must be reviewed before any real use.
 
 ## Not covered
