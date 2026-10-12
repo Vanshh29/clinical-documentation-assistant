@@ -120,7 +120,8 @@ function Workspace({ note, base }: { note: NoteDetail; base: ClinicalSummary }) 
   };
 
   const openApprove = async () => {
-    if (await form.trigger()) setDialog('approve');
+    // shouldFocus moves keyboard and screen-reader focus to the first invalid field.
+    if (await form.trigger(undefined, { shouldFocus: true })) setDialog('approve');
     else toast('Fix the highlighted fields before approving.', 'error');
   };
 

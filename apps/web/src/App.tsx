@@ -1,6 +1,6 @@
 import { Navigate, Outlet, RouterProvider, createBrowserRouter, useLocation } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
-import { PageLoading } from '@/components/feedback';
+import { ErrorState, PageLoading } from '@/components/feedback';
 import { AdminPage } from '@/features/admin/AdminPage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { NewNotePage } from '@/features/notes/NewNotePage';
@@ -20,9 +20,15 @@ function RequireRole({ role }: { role: Role }) {
 }
 
 function RequireUser() {
-  const { user, loading } = useAuth();
+  const { user, loading, error, retry } = useAuth();
   const location = useLocation();
   if (loading) return <PageLoading label="Signing in" />;
+  if (!user && error)
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16">
+        <ErrorState message={`We could not restore your session. ${error}`} onRetry={retry} />
+      </div>
+    );
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   return <AppShell />;
 }
