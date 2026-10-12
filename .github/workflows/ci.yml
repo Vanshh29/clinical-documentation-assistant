@@ -21,9 +21,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Scans the full history on every run (the packaged action trips over a repository's root commit).
+      - name: Scan all commits for secrets
+        run: docker run --rm -v "$PWD":/repo zricethezav/gitleaks:v8.21.2 detect --source /repo --redact --no-banner
 
   api:
     runs-on: ubuntu-24.04
@@ -233,7 +233,7 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
       - name: Scan image (fails on fixable HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: cda-${{ matrix.component }}:ci
           severity: HIGH,CRITICAL
@@ -246,7 +246,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Scan Dockerfiles, Terraform and Kubernetes config for misconfigurations
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: config
           scan-ref: .

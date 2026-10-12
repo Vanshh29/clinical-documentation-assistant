@@ -63,7 +63,7 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
       - name: Scan before pushing
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: ${{ vars.ECR_REGISTRY }}/cda-${{ matrix.component }}:${{ env.TAG }}
           severity: HIGH,CRITICAL
