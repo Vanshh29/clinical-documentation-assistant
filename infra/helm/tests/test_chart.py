@@ -189,19 +189,90 @@ def test_prod_uses_external_secrets_and_no_demo_users() -> None:
     )  # no in-cluster databases in prod
 
 
-def test_dev_runs_its_own_infrastructure_and_demo_users() -> None:
-    dev = render(
-        "-f",
-        "infra/helm/cda/values-dev.yaml"
-        if HELM[0].endswith("tool.sh")
-        else str(CHART / "values-dev.yaml"),
-    )
-    assert {
+def values(env: str) -> str:
+    rel = f"infra/helm/cda/values-{env}.yaml"
+    return rel if HELM[0].endswith("tool.sh") else str(ROOT / rel)
+
+
+def test_dev_uses_rds_plus_in_cluster_redpanda_and_demo_users() -> None:
+    dev = render("-f", values("dev"))
+    sets = {
         d["metadata"]["name"].rsplit("-", 1)[-1]
         for d in dev
         if d["kind"] == "StatefulSet"
-    } == {"postgres", "redpanda"}
+    }
+    assert sets == {"redpanda"}  # the database is the Terraform-managed RDS instance
     assert any(d["kind"] == "Job" and "seed" in d["metadata"]["name"] for d in dev)
+    # RDS exists before the release, so migrations can safely be a pre-sync hook.
+    assert any(
+        d["kind"] == "Job" and d["metadata"]["name"].endswith("-migrate") for d in dev
+    )
+
+
+def init_names(docs: list[dict]) -> list[str]:
+    api = next(
+        d
+        for d in docs
+        if d["kind"] == "Deployment" and d["metadata"]["name"].endswith("-api")
+    )
+    return [
+        c["name"] for c in api["spec"]["template"]["spec"].get("initContainers", [])
+    ]
+
+
+def test_in_cluster_postgres_migrates_in_an_init_container_not_a_hook() -> None:
+    """Regression: a pre-install hook runs before the in-release database exists and would never succeed."""
+    docs = render("-f", values("dev"), "--set", "devInfra.postgres.enabled=true")
+    assert {
+        d["metadata"]["name"].rsplit("-", 1)[-1]
+        for d in docs
+        if d["kind"] == "StatefulSet"
+    } == {"postgres", "redpanda"}
+    assert not any(
+        d["kind"] == "Job" and d["metadata"]["name"].endswith("-migrate") for d in docs
+    )
+    assert init_names(docs) == ["migrate"]
+    api = next(
+        d
+        for d in docs
+        if d["kind"] == "Deployment" and d["metadata"]["name"].endswith("-api")
+    )
+    init = api["spec"]["template"]["spec"]["initContainers"][0]
+    assert init["securityContext"]["readOnlyRootFilesystem"] is True
+    assert "alembic upgrade head" in init["command"][-1]
+
+
+def test_init_container_mode_can_be_chosen_explicitly() -> None:
+    docs = render("-f", values("prod"), "--set", "migrations.mode=initContainer")
+    assert init_names(docs) == ["migrate"]
+    assert not any(
+        d["kind"] == "Job" and d["metadata"]["name"].endswith("-migrate") for d in docs
+    )
+
+
+def test_migrations_can_be_disabled() -> None:
+    docs = render("-f", values("prod"), "--set", "migrations.enabled=false")
+    assert init_names(docs) == []
+    assert not any(
+        d["kind"] == "Job" and d["metadata"]["name"].endswith("-migrate") for d in docs
+    )
+
+
+def test_database_and_broker_policies_follow_the_in_cluster_services() -> None:
+    docs = render("-f", values("dev"), "--set", "devInfra.postgres.enabled=true")
+    names = {
+        d["metadata"]["name"].rsplit("-", 1)[-1]
+        for d in docs
+        if d["kind"] == "NetworkPolicy"
+    }
+    assert "devinfra" in names
+    worker = next(
+        d
+        for d in docs
+        if d["kind"] == "NetworkPolicy" and d["metadata"]["name"].endswith("-worker")
+    )
+    peers = [str(rule["to"]) for rule in worker["spec"]["egress"]]
+    assert any("postgres" in p for p in peers) and any("redpanda" in p for p in peers)
 
 
 def test_latest_and_empty_image_tags_are_refused() -> None:

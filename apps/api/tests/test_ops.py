@@ -96,3 +96,31 @@ async def test_retention_deletes_only_expired_notes_with_their_mappings(
         ).scalar_one()
         assert entry.details["retention_days"] == 30
         assert "Synthetic" not in str(entry.details)  # counts only, never content
+
+
+def test_concurrent_migrations_are_serialized_and_both_succeed(database_url: str) -> None:
+    """Several API replicas can start at once; the advisory lock keeps their migrations from colliding."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    import psycopg2
+
+    admin = database_url.replace("postgresql+asyncpg", "postgresql").rsplit("/", 1)[0] + "/postgres"
+    name = f"mig_{uuid.uuid4().hex[:8]}"
+    conn = psycopg2.connect(admin)
+    conn.autocommit = True
+    conn.cursor().execute(f'CREATE DATABASE "{name}"')
+    target = database_url.rsplit("/", 1)[0] + f"/{name}"
+    root = Path(__file__).resolve().parents[1]
+    env = {**os.environ, "DATABASE_URL": target, "PYTHONPATH": str(root / "src")}
+    procs = [
+        subprocess.Popen([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=root, env=env,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        for _ in range(4)
+    ]  # fmt: skip
+    results = [(p.wait(timeout=120), p.stderr.read() if p.stderr else "") for p in procs]
+    conn.cursor().execute(f'DROP DATABASE "{name}" WITH (FORCE)')
+    conn.close()
+    assert all(code == 0 for code, _ in results), results

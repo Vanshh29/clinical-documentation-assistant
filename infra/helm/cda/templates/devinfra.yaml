@@ -1,7 +1,8 @@
-{{- if .Values.devInfra.enabled }}
+{{- if or .Values.devInfra.postgres.enabled .Values.devInfra.redpanda.enabled }}
 # Single-node Postgres and Redpanda for local clusters and cheap dev. Not highly available; not for prod.
 {{- $pg := dict "root" . "component" "postgres" }}
 {{- $rp := dict "root" . "component" "redpanda" }}
+{{- if .Values.devInfra.postgres.enabled }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -63,7 +64,11 @@ metadata:
 spec:
   selector: {{- include "cda.selector" $pg | nindent 4 }}
   ports: [{ name: postgres, port: 5432, targetPort: postgres }]
+{{- end }}
+{{- if .Values.devInfra.redpanda.enabled }}
+{{- if .Values.devInfra.postgres.enabled }}
 ---
+{{- end }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -125,4 +130,5 @@ metadata:
 spec:
   selector: {{- include "cda.selector" $rp | nindent 4 }}
   ports: [{ name: kafka, port: 9092, targetPort: kafka }]
+{{- end }}
 {{- end }}

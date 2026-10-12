@@ -1,4 +1,5 @@
 # Dev environment: tracks main automatically (ArgoCD auto-sync + self-heal).
+# networkPolicy.databaseCidr should be the VPC CIDR from Terraform (default 10.0.0.0/16).
 images:
   api: { repository: REGISTRY/cda-api, tag: "0.1.0" }
   worker: { repository: REGISTRY/cda-worker, tag: "0.1.0" }
@@ -16,5 +17,6 @@ ingress:
   tls: { enabled: true, secretName: cda-dev-tls }
 
 demoUsers: { enabled: true }
-devInfra: { enabled: true }
+# Dev uses the RDS instance from Terraform and an in-cluster single-node Redpanda.
+devInfra: { redpanda: { enabled: true } }
 externalSecrets: { enabled: false }

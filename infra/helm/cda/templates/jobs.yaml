@@ -1,5 +1,5 @@
 {{- /* Hooks run on both `helm` and ArgoCD syncs: pre-* before the rollout, post-* after it. */ -}}
-{{- if .Values.migrations.enabled }}
+{{- if and .Values.migrations.enabled (not (include "cda.migrateInInit" .)) }}
 apiVersion: batch/v1
 kind: Job
 metadata:

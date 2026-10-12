@@ -62,7 +62,7 @@ spec:
       ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
     - to:
         - ipBlock: { cidr: {{ $np.databaseCidr }} }
-        {{- if .Values.devInfra.enabled }}
+        {{- if .Values.devInfra.postgres.enabled }}
         - podSelector:
             matchLabels: {{- include "cda.selector" (dict "root" . "component" "postgres") | nindent 14 }}
         {{- end }}
@@ -89,14 +89,14 @@ spec:
       ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
     - to:
         - ipBlock: { cidr: {{ $np.databaseCidr }} }
-        {{- if .Values.devInfra.enabled }}
+        {{- if .Values.devInfra.postgres.enabled }}
         - podSelector:
             matchLabels: {{- include "cda.selector" (dict "root" . "component" "postgres") | nindent 14 }}
         {{- end }}
       ports: [{ port: 5432, protocol: TCP }]
     - to:
         - ipBlock: { cidr: {{ $np.kafkaCidr }} }
-        {{- if .Values.devInfra.enabled }}
+        {{- if .Values.devInfra.redpanda.enabled }}
         - podSelector:
             matchLabels: {{- include "cda.selector" (dict "root" . "component" "redpanda") | nindent 14 }}
         {{- end }}
@@ -128,12 +128,12 @@ spec:
       ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
     - to:
         - ipBlock: { cidr: {{ $np.databaseCidr }} }
-        {{- if .Values.devInfra.enabled }}
+        {{- if .Values.devInfra.postgres.enabled }}
         - podSelector:
             matchLabels: {{- include "cda.selector" (dict "root" . "component" "postgres") | nindent 14 }}
         {{- end }}
       ports: [{ port: 5432, protocol: TCP }]
-{{- if .Values.devInfra.enabled }}
+{{- if or .Values.devInfra.postgres.enabled .Values.devInfra.redpanda.enabled }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

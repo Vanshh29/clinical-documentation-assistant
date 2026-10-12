@@ -21,4 +21,4 @@ worker:
 externalSecrets: { enabled: true }
 monitoring: { serviceMonitor: { enabled: true } }
 demoUsers: { enabled: false }
-devInfra: { enabled: false }
+devInfra: { postgres: { enabled: false }, redpanda: { enabled: false } }

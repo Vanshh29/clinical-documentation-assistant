@@ -72,3 +72,8 @@ capabilities:
 - name: AUTH_JWT_SECRET
   valueFrom: { secretKeyRef: { name: {{ include "cda.secretName" . }}, key: AUTH_JWT_SECRET } }
 {{- end -}}
+
+{{/* Migrate inside each API pod when asked to, or when the database lives in this release. */}}
+{{- define "cda.migrateInInit" -}}
+{{- if and .Values.migrations.enabled (or (eq .Values.migrations.mode "initContainer") .Values.devInfra.postgres.enabled) -}}true{{- end -}}
+{{- end -}}

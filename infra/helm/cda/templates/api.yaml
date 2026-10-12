@@ -36,6 +36,23 @@ spec:
                 topologyKey: kubernetes.io/hostname
                 labelSelector:
                   matchLabels: {{- include "cda.selector" $c | nindent 20 }}
+      {{- if include "cda.migrateInInit" . }}
+      initContainers:
+        - name: migrate
+          image: {{ include "cda.image" (dict "image" .Values.images.api "name" "api") }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          # Retries while the database is still starting; the advisory lock serializes replicas.
+          command: ["sh", "-c", "for i in $(seq 1 40); do alembic upgrade head && exit 0; echo 'database not ready, retrying'; sleep 5; done; exit 1"]
+          env:
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: {{ include "cda.secretName" . }}, key: DATABASE_URL } }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          securityContext: {{- include "cda.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      {{- end }}
       containers:
         - name: api
           image: {{ include "cda.image" (dict "image" .Values.images.api "name" "api") }}

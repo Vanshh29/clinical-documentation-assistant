@@ -96,8 +96,11 @@ networkPolicy:
 monitoring:
   serviceMonitor: { enabled: false, interval: 30s } # needs the Prometheus Operator CRDs
 
+# job: a Helm/ArgoCD pre-upgrade hook Job (needs the database to exist already, e.g. RDS).
+# initContainer: each API pod migrates before starting (used automatically with devInfra.postgres).
 migrations:
   enabled: true
+  mode: job
 
 retention:
   enabled: true
@@ -107,8 +110,8 @@ retention:
 demoUsers:
   enabled: false
 
-# Single-node Postgres and Redpanda for local clusters (kind) and cheap dev. Not for production.
+# Single-node Postgres and Redpanda inside the release, for local clusters (kind) and cheap dev.
+# Not highly available; never for production. Enable each independently.
 devInfra:
-  enabled: false
-  postgres: { image: "postgres:16.4-alpine", storage: 2Gi, database: cda, user: cda }
-  redpanda: { image: "docker.redpanda.com/redpandadata/redpanda:v24.2.7", storage: 2Gi }
+  postgres: { enabled: false, image: "postgres:16.4-alpine", storage: 2Gi, database: cda, user: cda }
+  redpanda: { enabled: false, image: "docker.redpanda.com/redpandadata/redpanda:v24.2.7", storage: 2Gi }

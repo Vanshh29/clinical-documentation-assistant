@@ -1,6 +1,7 @@
 import asyncio
 
 from alembic import context
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from cda_api.adapters.db.models import Base
@@ -12,6 +13,8 @@ target_metadata = Base.metadata
 def _run(connection) -> None:  # type: ignore[no-untyped-def]
     context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
     with context.begin_transaction():
+        # Several replicas may start together; only one migrates at a time (released on commit).
+        connection.execute(text("SELECT pg_advisory_xact_lock(727274)"))
         context.run_migrations()
 
 

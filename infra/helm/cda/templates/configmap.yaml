@@ -8,7 +8,7 @@ data:
   AUTH_JWT_ISSUER: {{ .Values.config.authIssuer | quote }}
   AUTH_JWT_AUDIENCE: {{ .Values.config.authAudience | quote }}
   RETENTION_DAYS: {{ .Values.config.retentionDays | quote }}
-  {{- if .Values.devInfra.enabled }}
+  {{- if .Values.devInfra.redpanda.enabled }}
   KAFKA_BOOTSTRAP_SERVERS: {{ default (printf "%s-redpanda:9092" (include "cda.fullname" .)) .Values.config.kafkaBootstrapServers | quote }}
   {{- else }}
   KAFKA_BOOTSTRAP_SERVERS: {{ required "config.kafkaBootstrapServers is required" .Values.config.kafkaBootstrapServers | quote }}
