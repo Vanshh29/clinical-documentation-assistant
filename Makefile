@@ -18,11 +18,11 @@ dev: up  ## Infra + app dev servers (apps added in later phases)
 	@echo "Infra is up. App services are added in Phase 2+."
 
 test:  ## Run all test suites (wired per app as they land)
-	@for d in apps/api apps/worker apps/web; do \
+	@for d in apps/api apps/worker apps/web eval; do \
 	  if [ -f $$d/Makefile ]; then $(MAKE) -C $$d test || exit 1; fi; done
 
 lint:  ## Run all linters
-	@for d in apps/api apps/worker apps/web; do \
+	@for d in apps/api apps/worker apps/web eval; do \
 	  if [ -f $$d/Makefile ]; then $(MAKE) -C $$d lint || exit 1; fi; done
 
 eval:  ## Run the evaluation harness (Phase 5)

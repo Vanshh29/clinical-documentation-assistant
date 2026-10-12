@@ -103,3 +103,34 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run build
+
+  eval:
+    runs-on: ubuntu-24.04
+    needs: [worker]
+    defaults:
+      run:
+        working-directory: eval
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            apps/api/pyproject.toml
+            apps/worker/pyproject.toml
+      - name: Install worker environment
+        working-directory: apps/worker
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -e ../api -e ".[dev]"
+          .venv/bin/pip install -r models-requirements.txt
+      - run: make test
+      - run: make lint
+      - name: Evaluate and gate on regressions
+        run: make run
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-report
+          path: docs/eval-report.md

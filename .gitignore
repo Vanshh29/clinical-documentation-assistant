@@ -47,3 +47,6 @@ infra/helm/**/charts/*.tgz
 # Local planning notes (not part of the published repo)
 CLAUDE.md
 .claude/
+
+# Evaluation run artifacts (the committed report is docs/eval-report.md)
+eval/results/

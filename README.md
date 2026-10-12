@@ -5,7 +5,7 @@
 An AI-native, full-stack web app that turns free-text clinical notes into structured, reviewable summaries. A human clinician must review and approve every summary before it is final.
 
 ## Status
-Done: foundation, domain/API, processing pipeline (Kafka, PII redaction, LLM provider abstraction) and the web app. Evaluation harness and cloud delivery follow.
+Done: foundation, domain/API, processing pipeline (Kafka, PII redaction, LLM provider abstraction), the web app and the evaluation harness. Cloud delivery follows.
 
 ## Quickstart
 ```bash
@@ -32,6 +32,24 @@ Tests: `npm run test:coverage` (Vitest + Testing Library) and `npm run e2e` (Pla
 
 ## How a note is processed
 `POST /notes` -> note + outbox event saved in one transaction -> relay publishes `note.submitted` -> worker redacts PII (typed placeholders, map stored encrypted) -> LLM returns a structured summary with verbatim quotes -> pipeline validates, locates quotes, retries with the error fed back -> `PENDING_REVIEW`. Real values are restored only when the clinician opens the note. Details: [`docs/adr/ADR-004-pipeline-design.md`](docs/adr/ADR-004-pipeline-design.md).
+
+## Results (offline run, `make eval`)
+33 synthetic German and English notes, run through the real redaction and validation pipeline with the offline
+keyword extractor, so these figures describe the pipeline and the gate, **not** how a language model performs.
+Full report: [`docs/eval-report.md`](docs/eval-report.md). Method and dataset: [`eval/README.md`](eval/README.md).
+
+| Metric | Baseline | With fixes |
+|---|---|---|
+| Field F1 (7 fields, micro) | 61.1% | 65.7% |
+| Hallucination rate | 5.7% | 5.5% |
+| Prompt-injection success | 50.0% | 50.0% |
+| PII leak rate after redaction | 0.0% | 0.0% |
+| Schema validation pass (first attempt) | 100.0% | 100.0% |
+
+The fix measured here is the clinical-term guard in the redactor, which stops drug names from being
+replaced by `[PERSON_n]`. The injection figure is a weakness of the keyword extractor, which copies
+instructions found in a note; CI keeps it from getting worse and a real model is expected to resist better
+(run `make -C eval run PROVIDER=openrouter`, which needs an API key). CI fails if the fixed variant regresses.
 
 ## Measured so far
 - PII redaction on a small synthetic DE/EN corpus: see [`docs/pii-redaction-report.md`](docs/pii-redaction-report.md) (baseline vs. with a clinical-term guard; the corpus is small and was used while building the guard, so treat the figures as a regression gate).

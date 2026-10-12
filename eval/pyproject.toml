@@ -1,0 +1,18 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "../apps/worker/src", "../apps/api/src"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["cda_eval/cases.py"]  # dataset: long literal lines are the point
+
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"cda_eval/report.py" = ["E501"]
+"tests/*" = ["E501"]
