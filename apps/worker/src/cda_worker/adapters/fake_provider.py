@@ -24,9 +24,9 @@ _RULES: list[tuple[str, re.Pattern[str]]] = [
             r"follow[- ]?up|re-?check|return in|kontrolle|wiedervorstellung|nachsorge", re.I
         ),
     ),
-    ("medications", re.compile(r"\b\d+(?:[.,]\d+)?\s?(?:mg|mcg|µg|g|ml|ie)\b", re.I)),
     ("assessment", re.compile(r"assessment|impression|diagnos|beurteilung|verdacht|suspect", re.I)),
     ("plan", re.compile(r"\bplan\b|recommend|will start|prescrib|therapie|empfehl|verordn", re.I)),
+    ("medications", re.compile(r"\b\d+(?:[.,]\d+)?\s?(?:mg|mcg|µg|g|ml|ie)\b", re.I)),
     (
         "chief_complaint",
         re.compile(

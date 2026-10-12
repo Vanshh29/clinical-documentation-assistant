@@ -1,0 +1,125 @@
+@import '@fontsource-variable/figtree';
+@import '@fontsource-variable/noto-sans';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens as space-separated RGB triples so Tailwind can apply opacity.
+   Light text/surface pairs are >= 4.5:1; primary (#0E7490) with white text is 5.4:1. */
+:root {
+  --bg: 244 248 250;
+  --surface: 255 255 255;
+  --surface-2: 236 243 246;
+  --line: 208 221 229;
+  --fg: 15 42 56;
+  --muted: 74 96 112;
+  --primary: 14 116 144;
+  --primary-hover: 21 94 117;
+  --on-primary: 255 255 255;
+  --success: 4 120 87;
+  --success-soft: 220 245 234;
+  --warning: 146 64 14;
+  --warning-soft: 254 243 199;
+  --danger: 185 28 28;
+  --danger-soft: 254 226 226;
+  --info: 3 105 161;
+  --info-soft: 224 242 254;
+  --mark: 253 224 71;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: 9 20 29;
+    --surface: 16 33 46;
+    --surface-2: 22 44 60;
+    --line: 42 68 88;
+    --fg: 230 240 245;
+    --muted: 159 181 196;
+    --primary: 34 211 238;
+    --primary-hover: 103 232 249;
+    --on-primary: 4 47 58;
+    --success: 52 211 153;
+    --success-soft: 6 60 45;
+    --warning: 251 191 36;
+    --warning-soft: 66 44 6;
+    --danger: 252 129 129;
+    --danger-soft: 69 17 17;
+    --info: 125 211 252;
+    --info-soft: 8 47 73;
+    --mark: 202 138 4;
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: light dark;
+  }
+  body {
+    @apply bg-bg font-sans text-fg antialiased;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight;
+  }
+  :focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-primary;
+  }
+  ::selection {
+    background: rgb(var(--primary) / 0.25);
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-line bg-surface shadow-card;
+  }
+  .input {
+    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-fg placeholder:text-muted/80
+      transition-colors duration-150 hover:border-muted focus:border-primary disabled:cursor-not-allowed disabled:opacity-60;
+    min-height: 44px;
+  }
+  .input[aria-invalid='true'] {
+    @apply border-danger;
+  }
+  .label {
+    @apply mb-1 block text-sm font-semibold;
+  }
+  .hint {
+    @apply mt-1 text-sm text-muted;
+  }
+  .error-text {
+    @apply mt-1 text-sm font-medium text-danger;
+  }
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold
+      transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50;
+    min-height: 44px;
+  }
+  .btn-primary {
+    @apply bg-primary text-on-primary hover:bg-primary-hover;
+  }
+  .btn-success {
+    @apply bg-success text-white hover:brightness-110 dark:text-[rgb(4_47_34)];
+  }
+  .btn-secondary {
+    @apply border border-line bg-surface text-fg hover:bg-surface-2;
+  }
+  .btn-danger {
+    @apply border border-danger/40 bg-surface text-danger hover:bg-danger-soft;
+  }
+  .btn-ghost {
+    @apply text-fg hover:bg-surface-2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

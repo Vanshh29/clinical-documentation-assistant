@@ -167,3 +167,16 @@ def test_truncation_keeps_a_sentence_aligned_prefix() -> None:
     assert len(cut) <= (1000 - 700) * 4
     same, flag = truncate_to_budget("kurz", 8000)
     assert (same, flag) == ("kurz", False)
+
+
+async def test_fake_provider_files_labelled_plan_sentences_under_plan_not_medications(
+    builder: PromptBuilder,
+) -> None:
+    note = (
+        "Jordan presents with cough. Takes lisinopril 10 mg once daily. "
+        "Plan: rest, fluids and paracetamol 500 mg as needed."
+    )
+    out = await run(FakeProvider(), builder, note=note)
+    assert out.summary is not None
+    assert out.summary.plan.value == "Plan: rest, fluids and paracetamol 500 mg as needed."
+    assert [m.name for m in out.summary.medications.value or []] == ["lisinopril"]
