@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Needs the API, worker, Postgres and Redpanda running (`make up`, then `make run` in apps/api and apps/worker).
+// Needs the API, worker, Postgres and Redpanda running. Either `make up` and set
+// E2E_BASE_URL=http://localhost:8080 (tests the built containers), or run the apps from source
+// and let this start the Vite dev server on :5173.
+const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:5173';
 export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,
@@ -8,7 +11,9 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],
-  use: { baseURL: 'http://localhost:5173', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
+  use: { baseURL, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: { command: 'npm run dev', url: 'http://localhost:5173', reuseExistingServer: true, timeout: 60_000 },
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : { command: 'npm run dev', url: baseURL, reuseExistingServer: true, timeout: 60_000 },
 });

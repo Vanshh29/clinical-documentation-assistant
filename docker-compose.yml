@@ -1,4 +1,5 @@
-# Local development stack. Application services are added in later phases.
+# Full local stack: infrastructure + migrations + api + worker + web.
+# `make up` builds the images and starts everything; open http://localhost:8080.
 # Demo only. Not a medical device. Not for real patient data.
 name: cda
 
@@ -39,6 +40,74 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  # One-shot: apply migrations and create the demo users (local demo only; both are idempotent).
+  migrate:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    image: cda-api:dev
+    command: ["sh", "-c", "alembic upgrade head && python -m cda_api.seed"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cda}:${POSTGRES_PASSWORD:-change-me-local-only}@postgres:5432/${POSTGRES_DB:-cda}
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  api:
+    image: cda-api:dev
+    environment: &app-env
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cda}:${POSTGRES_PASSWORD:-change-me-local-only}@postgres:5432/${POSTGRES_DB:-cda}
+      PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:?run `make env` first to generate PII_ENCRYPTION_KEY}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-dev-only-change-me-at-least-32-characters}
+      AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:-http://localhost:8000}
+      AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:-cda-web}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    deploy: { resources: { limits: { cpus: "1.0", memory: 512M } } }
+
+  worker:
+    build: { context: ., dockerfile: apps/worker/Dockerfile }
+    image: cda-worker:dev
+    environment:
+      <<: *app-env
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      LLM_PROVIDER: ${LLM_PROVIDER:-fake}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_MAX_INPUT_TOKENS: ${LLM_MAX_INPUT_TOKENS:-8000}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redpanda: { condition: service_healthy }
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    deploy: { resources: { limits: { cpus: "2.0", memory: 1500M } } }
+
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    image: cda-web:dev
+    environment:
+      API_UPSTREAM: http://api:8000
+    ports:
+      - "8080:8080"
+    depends_on:
+      api: { condition: service_healthy }
+    read_only: true
+    tmpfs: ["/tmp", "/var/cache/nginx", "/etc/nginx/conf.d:uid=101,gid=101"]  # rendered config goes here
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    deploy: { resources: { limits: { cpus: "0.5", memory: 128M } } }
 
 volumes:
   pgdata:

@@ -180,3 +180,21 @@ async def test_fake_provider_files_labelled_plan_sentences_under_plan_not_medica
     assert out.summary is not None
     assert out.summary.plan.value == "Plan: rest, fluids and paracetamol 500 mg as needed."
     assert [m.name for m in out.summary.medications.value or []] == ["lisinopril"]
+
+
+def test_prompts_directory_can_be_set_for_installed_images(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import importlib
+
+    from cda_worker.domain import prompts
+
+    (tmp_path / "v9").mkdir()
+    (tmp_path / "v9" / "system.md").write_text("SYS")
+    (tmp_path / "v9" / "user.md").write_text("<note>\n{note}\n</note>")
+    monkeypatch.setenv("CDA_PROMPTS_DIR", str(tmp_path))
+    try:
+        reloaded = importlib.reload(prompts)
+        built = reloaded.PromptBuilder("v9").build("hello")
+        assert built.system == "SYS" and "hello" in built.messages[0].content
+    finally:
+        monkeypatch.delenv("CDA_PROMPTS_DIR")
+        importlib.reload(prompts)

@@ -1,8 +1,12 @@
+import os
 from pathlib import Path
 
 from cda_worker.domain.ports import Message, Prompt
 
-DEFAULT_DIR = Path(__file__).resolve().parents[3] / "prompts"
+# In an image the package is installed, so the repo-relative path does not exist: set CDA_PROMPTS_DIR.
+DEFAULT_DIR = Path(
+    os.environ.get("CDA_PROMPTS_DIR") or Path(__file__).resolve().parents[3] / "prompts"
+)
 
 
 class PromptBuilder:
