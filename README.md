@@ -70,36 +70,46 @@ Every figure below came from a run; commands are given so you can reproduce them
 
 **Automated checks (231):** 47 API, 69 worker, 42 web unit, 22 evaluation, 29 Helm policy, 22 browser. Coverage: API 93 %, worker 88 %, web 88 % of lines; domain and application code 93-100 % (spec target 80 %).
 
-**Quality on 33 synthetic German and English notes** (`make eval`; method in [`eval/README.md`](eval/README.md)). The same notes, the same pipeline and the same scoring, run with the offline keyword extractor (which gates CI) and with a real hosted model:
+**Quality on 33 synthetic German and English notes** (`make eval`; method in [`eval/README.md`](eval/README.md)). The same notes, pipeline and scoring, run with the offline keyword extractor (which gates CI) and with two hosted models, using the current prompt (`v2`):
 
-| Metric | Offline extractor | `nvidia/nemotron-3-ultra-550b-a55b:free` |
+| Metric | Offline extractor | DeepSeek V4.1 Flash | Gemma 4 26B |
+|---|---|---|---|
+| Field F1 (7 fields, micro) | 65.7 % | **88.4 %** | 87.5 % |
+| Hallucination rate | 5.5 % | 0.5 % | 0.6 % |
+| Prompt-injection success | 50.0 % | **0.0 %** | **0.0 %** |
+| PII leak rate after redaction | 0.0 % | 0.0 % | 0.0 % |
+| Valid first try / after retries | 100 % / 100 % | 100 % / 100 % | 97.0 % / 100 % |
+| Notes with all 7 fields right (strict) | 0 % | 27.3 % | 24.2 % |
+| German / English F1 | - | 88.0 % / 88.7 % | 84.4 % / 90.2 % |
+| Median / p95 time per note | about 0 s | 9.7 s / 23.8 s | **6.3 s / 10.0 s** |
+| Cost per note | none | $0.00031 | **$0.00020** |
+
+A third, much larger free reasoning model (NVIDIA Nemotron 3 Ultra 550B) was measured with the first prompt only: 84.1 % F1, 0.6 % hallucination, 0 % injection, 94 s median per note ([report](docs/eval-report-nvidia-nemotron-3-ultra-550b-a55b-free-prompt-v1.md)). It is slow and its free quota ran out, so it was not re-run. All reports: [`docs/`](docs/) (`eval-report-<model>-prompt-<version>.md`; the offline one is [`docs/eval-report.md`](docs/eval-report.md)). Total spend on all hosted runs was about five cents.
+
+**Measuring a prompt change.** The first prompt left models unsure how to say "the note says there are none" (for example "No medications"), so they quoted the sentence for an empty field, which the schema rejected, and half the first answers needed a retry. Prompt `v2` explains "not mentioned" versus "stated as none" and shows the exact output shape; the schema now accepts a quoted "none". Same notes, same models:
+
+| | DeepSeek v1 -> v2 | Gemma v1 -> v2 |
 |---|---|---|
-| Field F1 (7 fields, micro) | 65.7 % | **84.1 %** |
-| Field precision / recall | 88.0 % / 52.5 % | 90.7 % / 78.5 % |
-| Hallucination rate | 5.5 % | **0.6 %** |
-| Prompt-injection success | 50.0 % | **0.0 %** |
-| PII leak rate after redaction | 0.0 % | 0.0 % |
-| Valid on first attempt / after up to 2 retries | 100 % / 100 % | 72.7 % / **97.0 %** |
-| Notes with all 7 fields right (strict) | 0 % | 6.1 % |
-| Median / p95 time per note | about 0 s | 94 s / 232 s |
-| Cost | none | none (free endpoint) |
+| Valid on the first try | 72.7 % -> **100 %** | 51.5 % -> **97.0 %** |
+| Median time per note | 19.8 s -> **9.7 s** | 7.4 s -> **6.3 s** |
+| Cost per note | $0.00054 -> **$0.00031** | $0.00026 -> **$0.00020** |
+| Overall F1 | 88.5 % -> 88.4 % | 85.7 % -> 87.5 % |
+| Allergies F1 | 67.9 % -> **93.9 %** | 72.7 % -> **93.8 %** |
+| Identifier-heavy notes F1 | 90.9 % -> 95.7 % | 58.8 % -> 95.7 % |
+| History of present illness F1 | 79.3 % -> **50.0 %** | 69.1 % -> **51.1 %** |
 
-Full reports: [`docs/eval-report.md`](docs/eval-report.md) (offline) and [`docs/eval-report-nvidia-nemotron-3-ultra-550b-a55b-free.md`](docs/eval-report-nvidia-nemotron-3-ultra-550b-a55b-free.md) (real model, run on 2026-10-12).
+So v2 bought reliability, speed, cost and the allergy and identifier fields, but **it made history of present illness worse** on both models; I suspect the prompt's example, which leaves that field empty, nudges models to do the same, but have not tested that. Treat the overall F1 change as small (one note moves a rate by about 3 points). The prompt was refined while looking at these same 33 notes, so the v2 figures are optimistic; a held-out set is the right next step.
 
-What the real run shows:
-- **The validate-and-retry loop earns its place.** More than a quarter of first answers were rejected (for example, a quote that was not word for word in the note); feeding the error back lifted the valid rate from 72.7 % to 97.0 %.
-- **Grounding held up.** 0.6 % of filled values cited text the note did not contain, and none of the four injection notes got the system prompt or the injected diagnosis through.
-- **German is weaker than English** (77.7 % vs 89.5 % F1). Allergies and medications are the weakest fields; `pii-de-01` failed outright because its requests timed out.
-- **It is slow.** This is a large reasoning model on a shared free tier, so a note takes minutes at worst. The queue-based design keeps the UI responsive (a progress screen, no blocked request), but the worker timeout must be raised for models like this (`LLM_TIMEOUT_SECONDS`).
+**What the retry loop does.** Validate-and-retry lifted valid answers from 72.7 % to 97-100 % on the first prompt, and with v2 it is rarely needed. Grounding held on every model: at most 0.6 % of filled values cited text the note did not contain, and no model let a note's injected instructions through.
 
-How far to trust it: 33 notes, one run, a free endpoint whose capacity and behaviour can change, gold written by hand. Compare runs of the same set, do not read the figures as clinical accuracy. The offline column describes the pipeline and the CI gate, not a language model. The redaction guard is measured separately on its own corpus ([`docs/pii-redaction-report.md`](docs/pii-redaction-report.md); developed against that corpus, so a regression gate).
+How far to trust all this: 33 notes, one run per cell, hand-written gold, free and paid endpoints that can change. Compare runs of the same set; do not read the figures as clinical accuracy. The offline column describes the pipeline and the CI gate, not a language model. The redaction guard is measured on its own corpus ([`docs/pii-redaction-report.md`](docs/pii-redaction-report.md)).
 
 **Pipeline speed** (`scripts/load_test.py`, 200 notes, one worker, offline provider, one laptop): every note reached review; median 0.53 s from submit to ready, p95 0.59-0.65 s; 9.7 notes/s at 5 concurrent submitters and 39 notes/s at 20. About half a second of that is the outbox poll interval. With the real reasoning model above the median is 94 s per note, so model time dominates completely. Method and caveats: [`docs/performance.md`](docs/performance.md).
 
 **Deployment:** the Helm chart ran on a local Kubernetes cluster and the same browser tests passed against the full stack. Terraform, ArgoCD and the CI workflows are validated and linted but were **not** applied to AWS or run on GitHub: [`docs/deploy.md`](docs/deploy.md#what-has-and-has-not-been-run).
 
 ## Limitations
-- One real model has been measured so far, a free shared endpoint (above). A paid, faster model has not been measured yet. `make -C eval run PROVIDER=openrouter` measures any hosted model (tokens and cost included) and writes `docs/eval-report-<model>.md`; the account needs credit for paid models, otherwise every note fails with `llm_credits_exhausted`.
+- Three hosted models were measured, each once per prompt, on a small hand-written set (above). Prompt `v2` was tuned on that same set, and it lowered history-of-present-illness accuracy; a held-out set would settle both. `make -C eval run PROVIDER=openrouter` measures any hosted model (tokens and cost included); the account needs credit for paid models, otherwise every note fails with `llm_credits_exhausted`.
 - The evaluation set is small (33 notes) and synthetic: one note moves a rate by 3 points.
 - The offline provider is a keyword extractor and is weak on messy notes (31.9 % F1 on abbreviations and fragments).
 - Long notes are cut at the input limit, so facts after the cut are not summarized.

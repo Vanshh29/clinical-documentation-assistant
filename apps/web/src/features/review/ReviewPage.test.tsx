@@ -145,3 +145,22 @@ describe('ReviewPage', () => {
     expect(await screen.findByText(/does not exist or you do not have access/)).toBeInTheDocument();
   });
 });
+
+describe('ReviewPage explicit absence', () => {
+  it('labels a field the note states as none differently from one it never mentions', async () => {
+    const note = noteFixture();
+    const content = summaryFixture();
+    content.medications = {
+      value: [],
+      confidence: 0.9,
+      source_spans: [{ start: 0, end: 20, text: 'Anna Beispiel presen' }],
+    };
+    note.summary = { ...note.summary, content };
+    mockApi({ 'GET /notes/n1': note });
+    open();
+    const meds = await screen.findByRole('region', { name: 'Medications mentioned' });
+    expect(within(meds).getByText('Stated as none')).toBeInTheDocument();
+    const hpi = screen.getByRole('region', { name: 'History of present illness' });
+    expect(within(hpi).getByText('Not documented')).toBeInTheDocument();
+  });
+});

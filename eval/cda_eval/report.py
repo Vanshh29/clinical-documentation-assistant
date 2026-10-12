@@ -62,7 +62,13 @@ def summary_dict(m: RunMetrics) -> dict[str, Any]:
 
 
 def render(
-    results: dict[str, RunMetrics], *, provider: str, model: str, command: str, limit: int | None
+    results: dict[str, RunMetrics],
+    *,
+    provider: str,
+    model: str,
+    command: str,
+    limit: int | None,
+    prompt_version: str = "v2",
 ) -> str:
     fixed = results.get("fixed") or next(iter(results.values()))
     base = results.get("baseline")
@@ -72,7 +78,7 @@ def render(
     L: list[str] = ["# Evaluation report", ""]
     L += [
         f"- **Generated:** {when}",
-        f"- **Provider / model:** `{provider}` / `{model}`",
+        f"- **Provider / model:** `{provider}` / `{model}` - prompt `{prompt_version}`",
         f"- **Dataset:** {fixed.n_cases} synthetic notes"
         + (f" (first {limit} of {len(CASES)})" if limit else "")
         + f" - German {langs['de']}, English {langs['en']} - "

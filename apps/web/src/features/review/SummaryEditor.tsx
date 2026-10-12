@@ -36,6 +36,8 @@ function Card({
   const f = base[name];
   const hasValue = Array.isArray(f.value) ? f.value.length > 0 : !!f.value;
   const hasSource = f.source_spans.length > 0;
+  // An empty list that cites a sentence means the note says there are none, not that it is silent.
+  const statedNone = Array.isArray(f.value) && f.value.length === 0 && hasSource;
   return (
     <section
       aria-labelledby={`${name}-label`}
@@ -48,7 +50,13 @@ function Card({
           <h3 id={`${name}-label`} className="text-sm font-bold">
             {FIELD_LABELS[name]}
           </h3>
-          <ConfidenceBadge level={confidenceLevel(hasValue, f.confidence)} value={f.confidence} />
+          {statedNone ? (
+            <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted">
+              Stated as none
+            </span>
+          ) : (
+            <ConfidenceBadge level={confidenceLevel(hasValue, f.confidence)} value={f.confidence} />
+          )}
         </div>
         {hasSource && (
           <button

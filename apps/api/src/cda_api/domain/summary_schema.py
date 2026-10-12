@@ -1,7 +1,8 @@
 """Versioned structured summary schema.
 
 Every field carries a confidence and the source spans that support it. A field the note does
-not document must be `value=None` with no spans; the model must never guess.
+not mention must be `value=None` with no spans; the model must never guess. An explicit statement
+of absence ("No medications") is an empty list that may cite the sentence saying so.
 """
 
 from typing import Literal
@@ -42,8 +43,9 @@ class SummaryField[T](BaseModel):
 
     @model_validator(mode="after")
     def _undocumented_has_no_support(self) -> "SummaryField[T]":
-        empty = self.value is None or self.value == [] or self.value == ""
-        if empty and self.source_spans:
+        # null (or "") means "not mentioned" and has nothing to cite; [] means "stated as none".
+        not_mentioned = self.value is None or self.value == ""
+        if not_mentioned and self.source_spans:
             raise ValueError("an undocumented field must not cite source spans")
         return self
 

@@ -25,7 +25,7 @@ class WorkerSettings(BaseSettings):
     llm_max_validation_retries: int = 2  # re-asks with the validation error fed back
     llm_price_in_per_mtok: Decimal = Decimal("0")
     llm_price_out_per_mtok: Decimal = Decimal("0")
-    prompt_version: str = "v1"
+    prompt_version: str = "v2"
 
     metrics_port: int = 9100
     heartbeat_path: str = "/tmp/cda-worker-heartbeat"

@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -28,7 +29,12 @@ async def main_async(args: argparse.Namespace) -> int:
     for name in names:
         print(f"running variant {name!r} on {len(cases)} notes ...", flush=True)
         results[name], _ = await run_variant(
-            VARIANTS[name], cases, provider, model, concurrency=args.concurrency
+            VARIANTS[name],
+            cases,
+            provider,
+            model,
+            concurrency=args.concurrency,
+            prompt_version=args.prompt_version,
         )
 
     for name, m in results.items():
@@ -44,15 +50,23 @@ async def main_async(args: argparse.Namespace) -> int:
             print(f"[{name}] notes that failed, by reason: {m.failure_reasons}")
 
     command = f"make eval{'' if args.provider == 'fake' else ' PROVIDER=' + args.provider}"
-    report = render(results, provider=args.provider, model=model, command=command, limit=args.limit)
+    report = render(
+        results,
+        provider=args.provider,
+        model=model,
+        command=command,
+        limit=args.limit,
+        prompt_version=args.prompt_version,
+    )
     if not args.no_write:
         # The offline run feeds the CI gate and keeps the canonical name; others get their own file.
         slug = re.sub(r"[^a-z0-9.]+", "-", model.lower()).strip("-")
-        default = "eval-report.md" if args.provider == "fake" else f"eval-report-{slug}.md"
+        tag = f"{slug}-prompt-{args.prompt_version}"
+        default = "eval-report.md" if args.provider == "fake" else f"eval-report-{tag}.md"
         out = Path(args.report) if args.report else ROOT / "docs" / default
         out.write_text(report, encoding="utf-8")
         RESULTS.mkdir(exist_ok=True)
-        results_name = "latest-fake.json" if args.provider == "fake" else f"latest-{slug}.json"
+        results_name = "latest-fake.json" if args.provider == "fake" else f"latest-{tag}.json"
         (RESULTS / results_name).write_text(
             json.dumps({k: summary_dict(v) for k, v in results.items()}, indent=2) + "\n",
             encoding="utf-8",
@@ -89,6 +103,11 @@ def main() -> None:
         "--limit", type=int, default=None, help="only the first N notes (cheap trial run)"
     )
     p.add_argument("--concurrency", type=int, default=1)
+    p.add_argument(
+        "--prompt-version",
+        default=os.environ.get("PROMPT_VERSION", "v2"),
+        help="prompt folder under apps/worker/prompts (default: PROMPT_VERSION or v2)",
+    )
     p.add_argument("--check", action="store_true", help="fail if the fixed variant regresses")
     p.add_argument(
         "--write-thresholds", action="store_true", help="record current values as the gate"

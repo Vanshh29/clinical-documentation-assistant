@@ -14,6 +14,9 @@
 8. **Delivery.** Transactional outbox -> relay -> Kafka (`SKIP LOCKED`, at-least-once). The consumer commits offsets after handling and the processor is idempotent (state and generation checks), so redelivery is harmless. A reaper fails notes left in `PROCESSING` by a crashed worker.
 9. **Provider.** `OpenRouterProvider` and an offline `FakeProvider` sit behind one `LLMProvider` port. Further providers can be added without touching the pipeline.
 
+## Prompt versions
+Prompts live in `apps/worker/prompts/<version>/` and the version is stored with every summary and audit entry. `v2` (default) separates "the note does not mention it" (null) from "the note says there are none" (an empty list that cites the sentence; for allergies, one item such as "no known allergies"), and shows the exact output shape. The measured effect on two hosted models is in the README: first-try validity up to 97-100 %, median time and cost down, allergy and identifier-heavy notes much better, history of present illness worse. The prompt was tuned on the evaluation notes, so a held-out set is needed before trusting the size of the gain.
+
 ## Known trade-offs
 - The worker imports the API package for models and state transitions. This avoids duplicating the schema, at the cost of coupled releases; extracting a shared `cda-core` package is the next step if the services diverge.
 - spaCy *small* models are fast but weak at German names; the clinical-term guard compensates for known failure modes and is measured in `docs/pii-redaction-report.md`.

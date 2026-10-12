@@ -203,3 +203,24 @@ def test_prompts_directory_can_be_set_for_installed_images(tmp_path, monkeypatch
 async def test_out_of_credits_is_reported_as_its_own_failure_reason(builder: PromptBuilder) -> None:
     out = await run(ScriptedProvider(LLMError("402", code="llm_credits_exhausted")), builder)
     assert out.summary is None and out.failure_reason == "llm_credits_exhausted"
+
+
+def test_prompt_v2_explains_absence_and_shows_the_exact_output_shape() -> None:
+    built = PromptBuilder("v2").build("hello")
+    assert "null always means" in built.system and "No medications." in built.system
+    assert '"source_spans"' in built.system and "OBJECT" in built.system
+    assert built.version == "v2" and "untrusted DATA" in built.system  # security rules kept
+
+
+async def test_a_quoted_statement_of_none_is_accepted_without_a_retry(
+    builder: PromptBuilder,
+) -> None:
+    payload = valid_payload()
+    payload["medications"] = {
+        "value": [], "confidence": 0.9,
+        "source_spans": [{"text": "Takes ibuprofen 400 mg twice daily."}],
+    }  # fmt: skip
+    provider = ScriptedProvider(payload)
+    out = await run(provider, builder)
+    assert out.summary is not None and out.retries == 0 and len(provider.prompts) == 1
+    assert out.summary.medications.value == []

@@ -84,3 +84,15 @@ def test_diff_reports_changed_fields_and_ratio() -> None:
     result = summary_diff(before, after)
     assert list(result["changed_fields"]) == ["chief_complaint"]
     assert 0 < result["edit_ratio"] < 1
+
+
+def test_an_explicit_none_may_cite_the_sentence_that_says_so() -> None:
+    field = SummaryField[list[str]](
+        value=[], confidence=0.9, source_spans=[span("ibuprofen 400 mg")]
+    )
+    assert field.value == [] and len(field.source_spans) == 1
+
+
+def test_an_empty_string_still_counts_as_not_mentioned() -> None:
+    with pytest.raises(ValidationError):
+        SummaryField[str](value="", source_spans=[span("cough")])
