@@ -10,7 +10,7 @@ metadata:
 spec:
   project: cda
   source:
-    repoURL: https://github.com/OWNER/clinical-documentation-assistant.git
+    repoURL: https://github.com/Vanshh29/clinical-documentation-assistant.git
     targetRevision: main
     path: infra/helm/cda
     helm:

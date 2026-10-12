@@ -7,7 +7,7 @@ metadata:
 spec:
   description: Clinical Documentation Assistant (demo only)
   sourceRepos:
-    - https://github.com/OWNER/clinical-documentation-assistant.git # set to your repository
+    - https://github.com/Vanshh29/clinical-documentation-assistant.git # set to your repository
   destinations:
     - { server: https://kubernetes.default.svc, namespace: cda-dev }
     - { server: https://kubernetes.default.svc, namespace: cda-prod }
