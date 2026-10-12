@@ -250,3 +250,29 @@ async def test_audit_log_is_append_only(session_factory) -> None:  # type: ignor
     async with session_factory() as s:
         with pytest.raises(DBAPIError, match="append-only"):
             await s.execute(text("DELETE FROM audit_log"))
+
+
+async def test_admin_metrics_reflect_review_outcomes(client, make_account, session_factory) -> None:  # type: ignore[no-untyped-def]
+    clinician, admin = await make_account(), await make_account(Role.ADMIN)
+    note = await _submit(client, clinician)
+    await _generate(session_factory, note["id"])
+    edited = make_summary("dry cough for three days").model_dump(mode="json")
+    await client.put(f"/notes/{note['id']}/summary", json=edited, headers=clinician.headers)
+    await client.post(f"/notes/{note['id']}/approve", headers=clinician.headers)
+
+    r = await client.get("/admin/metrics", headers=admin.headers)
+    assert r.status_code == 200
+    m = r.json()
+    assert m["notes_total"] >= 1 and m["notes_by_status"]["APPROVED"] >= 1
+    assert 0 < m["approval_rate"] <= 1
+    assert m["edit_rate"] > 0 and m["mean_edit_ratio"] > 0
+    assert m["llm_calls"] >= 1 and m["input_tokens"] >= 100
+    assert m["llm_latency_ms_p50"] is not None and m["time_to_summary_s_p50"] is not None
+    assert (await client.get("/admin/metrics", headers=clinician.headers)).status_code == 403
+    assert "cough" not in r.text  # aggregates only
+
+
+def test_shared_json_schema_is_up_to_date() -> None:
+    from cda_api.export_schemas import TARGET, render
+
+    assert TARGET.read_text() == render(), "run: python -m cda_api.export_schemas"

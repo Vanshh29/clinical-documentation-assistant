@@ -103,3 +103,21 @@ class AuditEntry(BaseModel):
 class AuditPage(BaseModel):
     items: list[AuditEntry]
     total: int
+
+
+class MetricsOut(BaseModel):
+    notes_total: int
+    notes_by_status: dict[str, int]
+    approval_rate: float | None
+    edit_rate: float | None
+    mean_edit_ratio: float | None
+    validation_failure_rate: float | None
+    llm_calls: int
+    llm_latency_ms_p50: float | None
+    llm_latency_ms_p95: float | None
+    time_to_summary_s_p50: float | None
+    time_to_summary_s_p95: float | None
+    input_tokens: int
+    output_tokens: int
+    cost_usd_total: float
+    cost_usd_per_note: float | None

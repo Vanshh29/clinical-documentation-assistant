@@ -1,0 +1,217 @@
+{
+  "$defs": {
+    "Medication": {
+      "additionalProperties": false,
+      "properties": {
+        "dose": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dose"
+        },
+        "frequency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frequency"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Medication",
+      "type": "object"
+    },
+    "SourceSpan": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "exclusiveMinimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "text"
+      ],
+      "title": "SourceSpan",
+      "type": "object"
+    },
+    "SummaryField_list_Medication__": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "source_spans": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "title": "Source Spans",
+          "type": "array"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Medication"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "title": "SummaryField[list[Medication]]",
+      "type": "object"
+    },
+    "SummaryField_list_str__": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "source_spans": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "title": "Source Spans",
+          "type": "array"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "title": "SummaryField[list[str]]",
+      "type": "object"
+    },
+    "SummaryField_str_": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "source_spans": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "title": "Source Spans",
+          "type": "array"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "title": "SummaryField[str]",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allergies": {
+      "$ref": "#/$defs/SummaryField_list_str__"
+    },
+    "assessment": {
+      "$ref": "#/$defs/SummaryField_str_"
+    },
+    "chief_complaint": {
+      "$ref": "#/$defs/SummaryField_str_"
+    },
+    "follow_up_items": {
+      "$ref": "#/$defs/SummaryField_list_str__"
+    },
+    "history_of_present_illness": {
+      "$ref": "#/$defs/SummaryField_str_"
+    },
+    "medications": {
+      "$ref": "#/$defs/SummaryField_list_Medication__"
+    },
+    "plan": {
+      "$ref": "#/$defs/SummaryField_str_"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "chief_complaint",
+    "history_of_present_illness",
+    "medications",
+    "allergies",
+    "assessment",
+    "plan",
+    "follow_up_items"
+  ],
+  "title": "ClinicalSummary",
+  "type": "object"
+}

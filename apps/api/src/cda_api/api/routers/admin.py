@@ -3,7 +3,8 @@ from sqlalchemy import func, select
 
 from cda_api.adapters.db.models import AuditLog
 from cda_api.api.deps import AdminDep, SessionDep
-from cda_api.api.schemas import AuditEntry, AuditPage
+from cda_api.api.schemas import AuditEntry, AuditPage, MetricsOut
+from cda_api.application import metrics as metrics_svc
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -24,3 +25,8 @@ async def list_audit(
         await session.execute(query.order_by(AuditLog.id.desc()).limit(limit).offset(offset))
     ).scalars()
     return AuditPage(items=[AuditEntry.model_validate(r) for r in rows], total=total)
+
+
+@router.get("/metrics", response_model=MetricsOut)
+async def get_metrics(_admin: AdminDep, session: SessionDep) -> MetricsOut:
+    return MetricsOut(**await metrics_svc.collect(session))
