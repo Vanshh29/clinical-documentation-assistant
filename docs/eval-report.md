@@ -32,7 +32,7 @@
 | Measure | baseline | fixed |
 |---|---|---|
 | Model latency p50 / p95 | 0 / 0 ms | 0 / 0 ms |
-| Per-note wall time p50 / p95 (redaction + model) | 7 / 10 ms | 7 / 12 ms |
+| Per-note wall time p50 / p95 (redaction + model) | 7 / 10 ms | 7 / 9 ms |
 | Tokens per note (in / out) | 723 / 236 | 723 / 240 |
 | Estimated cost per note | $0.0000 | $0.0000 |
 | Notes truncated to the input limit | 1 | 1 |

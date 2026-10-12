@@ -2,33 +2,35 @@
 
 > **Demo only. Not a medical device. Not for real patient data.** All sample data in this repository is synthetic.
 
-An AI-native, full-stack web app that turns free-text clinical notes into structured, reviewable summaries. A human clinician must review and approve every summary before it is final.
+A full-stack web app that turns free-text clinical notes into structured, reviewable summaries. A human clinician must review and approve every summary before it is final.
 
 ## Status
-Done: foundation, domain/API, processing pipeline (Kafka, PII redaction, LLM provider abstraction), the web app and the evaluation harness. Cloud delivery follows.
+Built and tested: domain and API, processing pipeline (Kafka, PII redaction, model provider abstraction), web app, evaluation harness, container images, Helm chart, Terraform for AWS, ArgoCD apps and CI/CD. See [what is verified and what is not](docs/deploy.md#what-has-and-has-not-been-run).
 
 ## Quickstart
+Needs Docker. This builds the images and starts everything (Postgres 16, Redpanda, API, worker, web):
 ```bash
-make env && make up                       # .env with a fresh encryption key; Postgres 16 + Redpanda
-cd apps/api    && make install && make migrate && make seed
-cd ../worker   && make install            # also downloads the spaCy models
-# three terminals:
-cd apps/api    && make run                # http://localhost:8000/docs
-cd apps/worker && make run                # consumes note.submitted, produces summaries
-cd apps/web    && npm ci && npm run dev   # http://localhost:5173
+make up                  # creates .env with a fresh encryption key on first run
+open http://localhost:8080
+make down                # stop; add V=1 to also delete the data volumes
 ```
-Runs fully offline with `LLM_PROVIDER=fake` (default, no API key). Set `LLM_PROVIDER=openrouter`, `OPENROUTER_API_KEY` and `LLM_MODEL` in `.env` to use a real model.
-
 Demo logins: `clinician1@demo.example`, `clinician2@demo.example`, `admin@demo.example`, password `demo-password-123` (local demo only).
 
-Tests: `make test` in `apps/api` and `apps/worker` (real Postgres, and Redpanda for the Kafka flow, via Testcontainers or `TEST_DATABASE_URL` / `KAFKA_BOOTSTRAP_SERVERS`).
+It runs fully offline with `LLM_PROVIDER=fake` (default, no API key). To use a hosted model set `LLM_PROVIDER=openrouter`, `OPENROUTER_API_KEY` and `LLM_MODEL` in `.env`, then `make up` again.
+
+### Working on the code
+```bash
+make infra                                # just Postgres + Redpanda in Docker
+cd apps/api    && make install && make migrate && make seed && make run     # http://localhost:8000/docs
+cd apps/worker && make install && make run                                  # consumes note.submitted
+cd apps/web    && npm ci && npm run dev                                     # http://localhost:5173
+```
+Tests: `make test` in `apps/api`, `apps/worker` and `eval` (real Postgres and Redpanda through Testcontainers, or `TEST_DATABASE_URL` / `KAFKA_BOOTSTRAP_SERVERS`); `npm run test:coverage` for unit tests and `E2E_BASE_URL=http://localhost:8080 npm run e2e` in `apps/web` for the browser tests against `make up`.
 
 ## The review screen
 ![Review screen, light theme](docs/screenshots/review-light.png)
 
 Original note on the left, editable summary on the right. Selecting a field highlights the text that supports it; every field shows a confidence level and says plainly when something is not documented. Nothing is final until a clinician approves it. Dark theme and phone layouts: [`dark`](docs/screenshots/review-dark.png), [`mobile`](docs/screenshots/review-mobile.png). Design decisions: [`ADR-005`](docs/adr/ADR-005-frontend-design.md).
-
-Tests: `npm run test:coverage` (Vitest + Testing Library) and `npm run e2e` (Playwright; needs the stack above running).
 
 ## How a note is processed
 `POST /notes` -> note + outbox event saved in one transaction -> relay publishes `note.submitted` -> worker redacts PII (typed placeholders, map stored encrypted) -> LLM returns a structured summary with verbatim quotes -> pipeline validates, locates quotes, retries with the error fed back -> `PENDING_REVIEW`. Real values are restored only when the clinician opens the note. Details: [`docs/adr/ADR-004-pipeline-design.md`](docs/adr/ADR-004-pipeline-design.md).
@@ -51,18 +53,24 @@ replaced by `[PERSON_n]`. The injection figure is a weakness of the keyword extr
 instructions found in a note; CI keeps it from getting worse and a real model is expected to resist better
 (run `make -C eval run PROVIDER=openrouter`, which needs an API key). CI fails if the fixed variant regresses.
 
+## Deploying
+Images, a Helm chart, Terraform for AWS (EKS, RDS, ECR) and ArgoCD apps are in `infra/`; CI builds, scans and pushes images and updates the dev GitOps values. Dev syncs automatically, prod is promoted by hand. Step-by-step setup, a local Kubernetes path and teardown: [`docs/deploy.md`](docs/deploy.md). Design decisions: [`ADR-006`](docs/adr/ADR-006-delivery.md).
+
 ## Measured so far
 - PII redaction on a small synthetic DE/EN corpus: see [`docs/pii-redaction-report.md`](docs/pii-redaction-report.md) (baseline vs. with a clinical-term guard; the corpus is small and was used while building the guard, so treat the figures as a regression gate).
 
 ## Repository layout
 ```
-apps/web        React frontend
-apps/api        FastAPI service
-apps/worker     Kafka consumer (PII + LLM pipeline)
-packages/schemas  Shared schemas
-infra/          Terraform, Helm, ArgoCD
-docs/           ADRs, architecture, threat model, eval report
-eval/           Evaluation dataset and runner
+apps/web          React frontend
+apps/api          FastAPI service (REST, auth, review workflow, audit log)
+apps/worker       Kafka consumer (PII redaction + model pipeline)
+packages/schemas  Shared JSON schema for the summary
+infra/terraform   AWS: network, EKS, RDS, ECR, CI roles
+infra/helm        Helm chart (api, worker, web, jobs, policies)
+infra/argocd      ArgoCD project and dev/prod applications
+docs/             ADRs, deploy guide, evaluation and PII reports
+eval/             Evaluation dataset, runner and CI gate
+scripts/          Helpers (tool runner, deploy configuration)
 ```
 
 Architecture decisions: [`docs/adr/`](docs/adr/).
