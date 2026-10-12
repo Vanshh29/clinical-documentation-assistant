@@ -51,6 +51,8 @@ def build_provider(kind: str) -> tuple[LLMProvider, str]:
             OpenRouterProvider(
                 key,
                 model,
+                # Reasoning models can take well over a minute per note.
+                timeout_seconds=float(os.environ.get("LLM_TIMEOUT_SECONDS", "300")),
                 price_in_per_mtok=Decimal(os.environ.get("LLM_PRICE_IN_PER_MTOK", "0")),
                 price_out_per_mtok=Decimal(os.environ.get("LLM_PRICE_OUT_PER_MTOK", "0")),
             ),

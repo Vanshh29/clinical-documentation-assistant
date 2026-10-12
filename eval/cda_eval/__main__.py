@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -46,11 +47,13 @@ async def main_async(args: argparse.Namespace) -> int:
     report = render(results, provider=args.provider, model=model, command=command, limit=args.limit)
     if not args.no_write:
         # The offline run feeds the CI gate and keeps the canonical name; others get their own file.
-        default = "eval-report.md" if args.provider == "fake" else f"eval-report-{args.provider}.md"
+        slug = re.sub(r"[^a-z0-9.]+", "-", model.lower()).strip("-")
+        default = "eval-report.md" if args.provider == "fake" else f"eval-report-{slug}.md"
         out = Path(args.report) if args.report else ROOT / "docs" / default
         out.write_text(report, encoding="utf-8")
         RESULTS.mkdir(exist_ok=True)
-        (RESULTS / f"latest-{args.provider}.json").write_text(
+        results_name = "latest-fake.json" if args.provider == "fake" else f"latest-{slug}.json"
+        (RESULTS / results_name).write_text(
             json.dumps({k: summary_dict(v) for k, v in results.items()}, indent=2) + "\n",
             encoding="utf-8",
         )

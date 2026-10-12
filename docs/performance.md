@@ -16,6 +16,6 @@ apps/api/.venv/bin/python scripts/load_test.py --notes 200 --concurrency 20
 ## How to read this
 - **Time to review has a floor of about half a second.** The outbox relay polls every 0.5 s (`OUTBOX_POLL_SECONDS`), so that interval, not the pipeline, dominates. Lowering it trades database polling for latency.
 - **Throughput here is limited by the load generator's concurrency**, not by the system: latency stayed flat while concurrency quadrupled, and the worker was nearly idle (about 1 % CPU) because the offline provider returns in about a millisecond.
-- **A real model changes everything.** Model latency will dominate (seconds, not milliseconds), so throughput per worker will fall to roughly the number of notes the provider can handle concurrently. Scale with more worker replicas, up to the topic's partition count.
+- **A real model changes everything.** Measured once with a large free reasoning model: median 94 s and p95 232 s per note, about 3,500 output tokens each (mostly reasoning), see the evaluation report. Model latency will dominate (seconds, not milliseconds), so throughput per worker will fall to roughly the number of notes the provider can handle concurrently. Scale with more worker replicas, up to the topic's partition count.
 - **Redaction cost:** the spaCy models make the worker the heaviest container (about 0.3 GB resident at idle in this run, image 883 MB).
 - Single laptop, single run per row, no warm-up control: use the numbers to compare changes on the same machine, not as capacity claims.

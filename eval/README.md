@@ -7,7 +7,7 @@ regressions from merging.
 make eval                      # from the repo root: baseline vs fixed, writes docs/eval-report.md, gates CI
 make -C eval test              # tests for the dataset, scoring and gate
 make -C eval run PROVIDER=openrouter   # real model; needs OPENROUTER_API_KEY and LLM_MODEL in the environment
-                                       # and credit on the account; writes docs/eval-report-openrouter.md
+                                       # and credit on the account; writes docs/eval-report-<model>.md
 ```
 
 It calls the same functions the worker runs (redaction, input limit, generation with validation and

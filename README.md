@@ -70,24 +70,36 @@ Every figure below came from a run; commands are given so you can reproduce them
 
 **Automated checks (231):** 47 API, 69 worker, 42 web unit, 22 evaluation, 29 Helm policy, 22 browser. Coverage: API 93 %, worker 88 %, web 88 % of lines; domain and application code 93-100 % (spec target 80 %).
 
-**Quality on 33 synthetic German and English notes** (`make eval`, offline extractor, so this measures the pipeline and the CI gate, **not** a language model; method in [`eval/README.md`](eval/README.md), full report in [`docs/eval-report.md`](docs/eval-report.md)):
+**Quality on 33 synthetic German and English notes** (`make eval`; method in [`eval/README.md`](eval/README.md)). The same notes, the same pipeline and the same scoring, run with the offline keyword extractor (which gates CI) and with a real hosted model:
 
-| Metric | Baseline | With fixes |
+| Metric | Offline extractor | `nvidia/nemotron-3-ultra-550b-a55b:free` |
 |---|---|---|
-| Field F1 (7 fields, micro) | 61.1 % | 65.7 % |
-| Hallucination rate | 5.7 % | 5.5 % |
-| Prompt-injection success | 50.0 % | 50.0 % |
+| Field F1 (7 fields, micro) | 65.7 % | **84.1 %** |
+| Field precision / recall | 88.0 % / 52.5 % | 90.7 % / 78.5 % |
+| Hallucination rate | 5.5 % | **0.6 %** |
+| Prompt-injection success | 50.0 % | **0.0 %** |
 | PII leak rate after redaction | 0.0 % | 0.0 % |
-| Schema validation pass (first attempt) | 100 % | 100 % |
+| Valid on first attempt / after up to 2 retries | 100 % / 100 % | 72.7 % / **97.0 %** |
+| Notes with all 7 fields right (strict) | 0 % | 6.1 % |
+| Median / p95 time per note | about 0 s | 94 s / 232 s |
+| Cost | none | none (free endpoint) |
 
-The measured fix is the clinical-term guard in the redactor, which stops drug names from being replaced by `[PERSON_n]`. The injection figure is a weakness of the keyword extractor, which copies instructions it finds in a note; CI stops it from getting worse. On a small corpus the redactor reaches 100 % recall, 100 % precision and 100 % clinical-text retention after the guard (baseline 100 % / 85.7 % / 87.9 %); the guard was developed against that same corpus, so treat it as a regression gate ([`docs/pii-redaction-report.md`](docs/pii-redaction-report.md)).
+Full reports: [`docs/eval-report.md`](docs/eval-report.md) (offline) and [`docs/eval-report-nvidia-nemotron-3-ultra-550b-a55b-free.md`](docs/eval-report-nvidia-nemotron-3-ultra-550b-a55b-free.md) (real model, run on 2026-10-12).
 
-**Pipeline speed** (`scripts/load_test.py`, 200 notes, one worker, offline provider, one laptop): every note reached review; median 0.53 s from submit to ready, p95 0.59-0.65 s; 9.7 notes/s at 5 concurrent submitters and 39 notes/s at 20. About half a second of that is the outbox poll interval. A real model will dominate latency. Method and caveats: [`docs/performance.md`](docs/performance.md).
+What the real run shows:
+- **The validate-and-retry loop earns its place.** More than a quarter of first answers were rejected (for example, a quote that was not word for word in the note); feeding the error back lifted the valid rate from 72.7 % to 97.0 %.
+- **Grounding held up.** 0.6 % of filled values cited text the note did not contain, and none of the four injection notes got the system prompt or the injected diagnosis through.
+- **German is weaker than English** (77.7 % vs 89.5 % F1). Allergies and medications are the weakest fields; `pii-de-01` failed outright because its requests timed out.
+- **It is slow.** This is a large reasoning model on a shared free tier, so a note takes minutes at worst. The queue-based design keeps the UI responsive (a progress screen, no blocked request), but the worker timeout must be raised for models like this (`LLM_TIMEOUT_SECONDS`).
+
+How far to trust it: 33 notes, one run, a free endpoint whose capacity and behaviour can change, gold written by hand. Compare runs of the same set, do not read the figures as clinical accuracy. The offline column describes the pipeline and the CI gate, not a language model. The redaction guard is measured separately on its own corpus ([`docs/pii-redaction-report.md`](docs/pii-redaction-report.md); developed against that corpus, so a regression gate).
+
+**Pipeline speed** (`scripts/load_test.py`, 200 notes, one worker, offline provider, one laptop): every note reached review; median 0.53 s from submit to ready, p95 0.59-0.65 s; 9.7 notes/s at 5 concurrent submitters and 39 notes/s at 20. About half a second of that is the outbox poll interval. With the real reasoning model above the median is 94 s per note, so model time dominates completely. Method and caveats: [`docs/performance.md`](docs/performance.md).
 
 **Deployment:** the Helm chart ran on a local Kubernetes cluster and the same browser tests passed against the full stack. Terraform, ArgoCD and the CI workflows are validated and linted but were **not** applied to AWS or run on GitHub: [`docs/deploy.md`](docs/deploy.md#what-has-and-has-not-been-run).
 
 ## Limitations
-- No real model has been measured yet; the numbers above use the offline provider. `make -C eval run PROVIDER=openrouter` measures a hosted model (tokens and cost included) and writes `docs/eval-report-openrouter.md`; the account behind the key needs credit, otherwise every note fails with `llm_credits_exhausted`.
+- One real model has been measured so far, a free shared endpoint (above). A paid, faster model has not been measured yet. `make -C eval run PROVIDER=openrouter` measures any hosted model (tokens and cost included) and writes `docs/eval-report-<model>.md`; the account needs credit for paid models, otherwise every note fails with `llm_credits_exhausted`.
 - The evaluation set is small (33 notes) and synthetic: one note moves a rate by 3 points.
 - The offline provider is a keyword extractor and is weak on messy notes (31.9 % F1 on abbreviations and fragments).
 - Long notes are cut at the input limit, so facts after the cut are not summarized.
