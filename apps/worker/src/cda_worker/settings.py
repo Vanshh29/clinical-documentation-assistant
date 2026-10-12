@@ -25,6 +25,9 @@ class WorkerSettings(BaseSettings):
     llm_price_out_per_mtok: Decimal = Decimal("0")
     prompt_version: str = "v1"
 
+    metrics_port: int = 9100
+    heartbeat_path: str = "/tmp/cda-worker-heartbeat"
+    otel_exporter_otlp_endpoint: str = ""
     outbox_poll_seconds: float = 0.5
     stuck_after_minutes: int = 10
     log_level: str = "INFO"

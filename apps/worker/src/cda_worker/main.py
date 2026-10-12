@@ -11,6 +11,7 @@ from cda_api.adapters.db.models import Note
 from cda_api.adapters.db.session import make_engine, make_session_factory
 from cda_api.domain.enums import NoteStatus
 from cda_api.logging_setup import configure_logging
+from prometheus_client import start_http_server
 from sqlalchemy import select
 
 from cda_worker.adapters.circuit_breaker import CircuitBreakerProvider
@@ -20,6 +21,7 @@ from cda_worker.adapters.openrouter_provider import OpenRouterProvider
 from cda_worker.adapters.redactor import PresidioRedactor
 from cda_worker.domain.ports import LLMProvider
 from cda_worker.domain.prompts import PromptBuilder
+from cda_worker.health import heartbeat
 from cda_worker.service import FAILURE_STUCK, NoteProcessor
 from cda_worker.settings import WorkerSettings, get_settings
 
@@ -99,6 +101,7 @@ async def run() -> None:
         enable_auto_commit=False,
         auto_offset_reset="earliest",
     )
+    start_http_server(settings.metrics_port)
     await producer.start()
     await consumer.start()
 
@@ -112,6 +115,7 @@ async def run() -> None:
         asyncio.create_task(run_consumer(consumer, handle)),
         asyncio.create_task(reaper()),
     ]
+    tasks.append(asyncio.create_task(heartbeat(settings.heartbeat_path, list(tasks))))
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):

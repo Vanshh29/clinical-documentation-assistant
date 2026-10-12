@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 import uuid
 from dataclasses import dataclass
 
@@ -13,6 +14,7 @@ from cda_api.domain.redaction_map import RedactionMap
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from cda_worker import metrics
 from cda_worker.domain.generation import GenerationOutcome, generate_validated
 from cda_worker.domain.limits import truncate_to_budget
 from cda_worker.domain.ports import LLMProvider, Redactor
@@ -37,8 +39,10 @@ class NoteProcessor:
 
     async def process(self, note_id: uuid.UUID, generation: int) -> str:
         """Returns 'done', 'failed' or 'skipped'. Safe to call twice for the same event."""
+        started = time.perf_counter()
         claimed = await self._claim(note_id, generation)
         if claimed is None:
+            metrics.NOTES.labels("skipped").inc()
             return "skipped"  # duplicate delivery, regenerated since, or erased
         body, language = claimed
 
@@ -54,6 +58,7 @@ class NoteProcessor:
             model_name=self.model_name,
         )
         await self._finish(note_id, outcome)
+        self._record(outcome, redaction.counts, time.perf_counter() - started)
         log.info(
             "note processed",
             extra={
@@ -73,6 +78,17 @@ class NoteProcessor:
             },
         )
         return "done" if outcome.summary else "failed"
+
+    @staticmethod
+    def _record(outcome: GenerationOutcome, redactions: dict[str, int], seconds: float) -> None:
+        metrics.NOTES.labels("ok" if outcome.summary else outcome.failure_reason or "failed").inc()
+        metrics.DURATION.observe(seconds)
+        metrics.LLM_TOKENS.labels("input").inc(outcome.input_tokens)
+        metrics.LLM_TOKENS.labels("output").inc(outcome.output_tokens)
+        metrics.LLM_COST.inc(float(outcome.cost_usd))
+        metrics.LLM_RETRIES.inc(outcome.retries)
+        for kind, n in redactions.items():
+            metrics.REDACTIONS.labels(kind).inc(n)
 
     async def _claim(self, note_id: uuid.UUID, generation: int) -> tuple[str, str] | None:
         async with self.session_factory() as session:

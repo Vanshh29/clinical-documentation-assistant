@@ -17,9 +17,17 @@ dependencies = [
   "alembic>=1.13,<2",
   "pyjwt>=2.9,<3",
   "cryptography>=43,<46",
+  "prometheus-client>=0.20,<1",
 ]
 
 [project.optional-dependencies]
+otel = [
+  "opentelemetry-sdk>=1.27,<2",
+  "opentelemetry-exporter-otlp-proto-http>=1.27,<2",
+  "opentelemetry-instrumentation-fastapi>=0.48b0",
+  "opentelemetry-instrumentation-sqlalchemy>=0.48b0",
+  "opentelemetry-instrumentation-httpx>=0.48b0",
+]
 dev = [
   "pytest>=8,<9",
   "pytest-asyncio>=0.24,<1",

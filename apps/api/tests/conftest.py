@@ -47,7 +47,9 @@ def database_url() -> Iterator[str]:
 
 @pytest_asyncio.fixture(scope="session")
 async def app(database_url: str) -> AsyncIterator[FastAPI]:
-    application = create_app(Settings(database_url=database_url, log_level="WARNING"))
+    application = create_app(
+        Settings(database_url=database_url, log_level="WARNING", metrics_port=0)
+    )
     async with application.router.lifespan_context(application):
         yield application
 

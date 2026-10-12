@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # Fernet key for the PII placeholder map. Empty means redaction-dependent features are off.
     pii_encryption_key: str = ""
 
+    metrics_port: int = 9100  # internal listener, never exposed through the ingress
+    otel_exporter_otlp_endpoint: str = ""
+    service_name: str = "cda-api"
+
     max_note_chars: int = 50_000
     retention_days: int = 30
     log_level: str = "INFO"

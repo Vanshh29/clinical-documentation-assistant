@@ -19,6 +19,12 @@ from cda_api.domain.errors import (
     ValidationFailed,
 )
 from cda_api.logging_setup import configure_logging
+from cda_api.observability import (
+    install_metrics_middleware,
+    instrument_engine,
+    setup_tracing,
+    start_metrics_server,
+)
 
 log = logging.getLogger("cda.api")
 
@@ -33,6 +39,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine = make_engine(settings.database_url)
         app.state.engine = engine
+        if tracing:
+            instrument_engine(engine)
+        start_metrics_server(settings.metrics_port)
         app.state.session_factory = make_session_factory(engine)
         yield
         await engine.dispose()
@@ -44,6 +53,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
+    install_metrics_middleware(app)
+    tracing = setup_tracing(app, settings.otel_exporter_otlp_endpoint, settings.service_name)
 
     app.add_middleware(
         CORSMiddleware,

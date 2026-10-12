@@ -237,3 +237,27 @@ async def test_erasing_data_removes_the_mapping(
         await s.commit()
         assert await s.get(PiiMapping, note.id) is None
         assert (await s.execute(select(LlmCall).where(LlmCall.note_id == note.id))).first() is None
+
+
+async def test_processing_updates_prometheus_metrics(
+    session_factory: async_sessionmaker[AsyncSession],
+    redactor: PresidioRedactor,
+    cipher: MappingCipher,
+) -> None:
+    from prometheus_client import REGISTRY
+
+    def val(name: str, labels: dict[str, str] | None = None) -> float:
+        return REGISTRY.get_sample_value(name, labels or {}) or 0.0
+
+    ok_before = val("cda_worker_notes_total", {"outcome": "ok"})
+    tokens_before = val("cda_worker_llm_tokens_total", {"direction": "input"})
+    redacted_before = val("cda_worker_redactions_total", {"type": "PERSON"})
+    note, _ = await make_note(session_factory)
+    proc = make_processor(session_factory, redactor, cipher, FakeProvider())
+    await proc.process(note.id, 1)
+    await proc.process(note.id, 1)  # duplicate delivery
+    assert val("cda_worker_notes_total", {"outcome": "ok"}) == ok_before + 1
+    assert val("cda_worker_notes_total", {"outcome": "skipped"}) >= 1
+    assert val("cda_worker_llm_tokens_total", {"direction": "input"}) > tokens_before
+    assert val("cda_worker_redactions_total", {"type": "PERSON"}) > redacted_before
+    assert val("cda_worker_note_duration_seconds_count") >= 1
