@@ -33,9 +33,12 @@ class LLMResult:
 
 
 class LLMError(Exception):
-    def __init__(self, message: str, *, retryable: bool = False) -> None:
+    def __init__(
+        self, message: str, *, retryable: bool = False, code: str = "llm_request_rejected"
+    ) -> None:
         super().__init__(message)
         self.retryable = retryable
+        self.code = code  # short, safe failure reason stored on the note
 
 
 class LLMUnavailable(LLMError):

@@ -189,6 +189,7 @@ class RunMetrics:
     cost_usd_mean: float = 0.0
     cost_usd_total: float = 0.0
     misses: list[str] = field(default_factory=list)
+    failure_reasons: dict[str, int] = field(default_factory=dict)
 
 
 def aggregate(variant: str, rows: list[dict[str, Any]]) -> RunMetrics:
@@ -222,6 +223,10 @@ def aggregate(variant: str, rows: list[dict[str, Any]]) -> RunMetrics:
             wrong = [n for n, c in s.per_field.items() if not c.correct]
             m.misses.append(f"{case.id} ({', '.join(wrong) if wrong else 'no summary'})")
         m.truncated_cases += bool(r["truncated"])
+        if r.get("failure_reason"):
+            m.failure_reasons[r["failure_reason"]] = (
+                m.failure_reasons.get(r["failure_reason"], 0) + 1
+            )
     m.exact_case_rate = sum(r["score"].case_correct for r in rows) / len(rows)
     m.hallucination_rate = unsup / nonnull if nonnull else 0.0
     m.overreach_rate = overreach / empty_gold if empty_gold else 0.0

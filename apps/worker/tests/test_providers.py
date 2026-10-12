@@ -164,3 +164,18 @@ async def test_circuit_opens_then_recovers_after_reset_window() -> None:
     inner.fail = False
     assert (await cb.generate_structured(PROMPT, LlmSummary)).model == "m"
     assert not cb.is_open
+
+
+@pytest.mark.parametrize(
+    ("status", "code"),
+    [
+        (402, "llm_credits_exhausted"),
+        (401, "llm_auth_failed"),
+        (403, "llm_auth_failed"),
+        (400, "llm_request_rejected"),
+    ],
+)
+async def test_rejections_carry_an_actionable_reason(status: int, code: str) -> None:
+    with pytest.raises(LLMError) as err:
+        await provider(lambda r: httpx.Response(status), []).generate_structured(PROMPT, LlmSummary)
+    assert err.value.code == code and not err.value.retryable

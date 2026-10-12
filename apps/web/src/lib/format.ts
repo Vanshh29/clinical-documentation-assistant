@@ -35,6 +35,8 @@ export const FAILURE_MESSAGES: Record<string, string> = {
   schema_validation_failed: 'The model did not return a summary that passed validation after several attempts.',
   llm_unavailable: 'The language model service was not reachable. Nothing is wrong with your note.',
   llm_request_rejected: 'The language model service rejected the request.',
+  llm_credits_exhausted: 'The language model account has no credit left. An administrator needs to top it up.',
+  llm_auth_failed: 'The language model service did not accept the configured credentials.',
   worker_timeout: 'Processing took too long and was stopped.',
   internal_error: 'Something went wrong while processing this note.',
 };

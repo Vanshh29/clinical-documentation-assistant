@@ -30,10 +30,24 @@ async def main_async(args: argparse.Namespace) -> int:
             VARIANTS[name], cases, provider, model, concurrency=args.concurrency
         )
 
+    for name, m in results.items():
+        print(
+            f"[{name}] F1 {m.overall.f1:.1%} | hallucination {m.hallucination_rate:.1%} | "
+            f"injection {m.injection_success_rate or 0:.1%} | PII leak {m.pii_leak_rate:.1%} | "
+            f"first-pass {m.first_pass_rate:.1%} | final-pass {m.final_pass_rate:.1%} | "
+            f"latency p50/p95 {m.latency_ms_p50:.0f}/{m.latency_ms_p95:.0f} ms | "
+            f"tokens/note {m.input_tokens_mean:.0f}+{m.output_tokens_mean:.0f} | "
+            f"cost/note ${m.cost_usd_mean:.5f} | total ${m.cost_usd_total:.4f}"
+        )
+        if m.failure_reasons:
+            print(f"[{name}] notes that failed, by reason: {m.failure_reasons}")
+
     command = f"make eval{'' if args.provider == 'fake' else ' PROVIDER=' + args.provider}"
     report = render(results, provider=args.provider, model=model, command=command, limit=args.limit)
     if not args.no_write:
-        out = Path(args.report) if args.report else ROOT / "docs" / "eval-report.md"
+        # The offline run feeds the CI gate and keeps the canonical name; others get their own file.
+        default = "eval-report.md" if args.provider == "fake" else f"eval-report-{args.provider}.md"
+        out = Path(args.report) if args.report else ROOT / "docs" / default
         out.write_text(report, encoding="utf-8")
         RESULTS.mkdir(exist_ok=True)
         (RESULTS / f"latest-{args.provider}.json").write_text(

@@ -87,7 +87,7 @@ The measured fix is the clinical-term guard in the redactor, which stops drug na
 **Deployment:** the Helm chart ran on a local Kubernetes cluster and the same browser tests passed against the full stack. Terraform, ArgoCD and the CI workflows are validated and linted but were **not** applied to AWS or run on GitHub: [`docs/deploy.md`](docs/deploy.md#what-has-and-has-not-been-run).
 
 ## Limitations
-- No real model has been measured yet; the numbers above use the offline provider. Run `make -C eval run PROVIDER=openrouter` with a key to measure one (it records tokens and cost).
+- No real model has been measured yet; the numbers above use the offline provider. `make -C eval run PROVIDER=openrouter` measures a hosted model (tokens and cost included) and writes `docs/eval-report-openrouter.md`; the account behind the key needs credit, otherwise every note fails with `llm_credits_exhausted`.
 - The evaluation set is small (33 notes) and synthetic: one note moves a rate by 3 points.
 - The offline provider is a keyword extractor and is weak on messy notes (31.9 % F1 on abbreviations and fragments).
 - Long notes are cut at the input limit, so facts after the cut are not summarized.

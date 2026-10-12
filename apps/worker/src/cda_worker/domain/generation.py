@@ -48,8 +48,8 @@ async def generate_validated(
         except LLMUnavailable:
             out.failure_reason = FAILURE_UNAVAILABLE
             return out
-        except LLMError:
-            out.failure_reason = FAILURE_REJECTED
+        except LLMError as exc:
+            out.failure_reason = exc.code or FAILURE_REJECTED
             return out
         out.model = result.model
         out.input_tokens += result.input_tokens

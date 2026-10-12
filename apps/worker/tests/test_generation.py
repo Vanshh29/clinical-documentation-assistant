@@ -198,3 +198,8 @@ def test_prompts_directory_can_be_set_for_installed_images(tmp_path, monkeypatch
     finally:
         monkeypatch.delenv("CDA_PROMPTS_DIR")
         importlib.reload(prompts)
+
+
+async def test_out_of_credits_is_reported_as_its_own_failure_reason(builder: PromptBuilder) -> None:
+    out = await run(ScriptedProvider(LLMError("402", code="llm_credits_exhausted")), builder)
+    assert out.summary is None and out.failure_reason == "llm_credits_exhausted"

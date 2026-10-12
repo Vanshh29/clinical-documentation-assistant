@@ -23,6 +23,8 @@ log = logging.getLogger("cda.worker.llm")
 
 _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
 RETRYABLE_STATUS = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
+# Reasons an operator can act on, instead of one generic "rejected".
+REJECTION_CODES = {401: "llm_auth_failed", 403: "llm_auth_failed", 402: "llm_credits_exhausted"}
 
 
 class OpenRouterProvider:
@@ -91,7 +93,10 @@ class OpenRouterProvider:
                 if response.status_code == 200:
                     return self._parse(response, started, attempts)
                 if response.status_code not in RETRYABLE_STATUS:
-                    raise LLMError(f"request rejected with status {response.status_code}")
+                    raise LLMError(
+                        f"request rejected with status {response.status_code}",
+                        code=REJECTION_CODES.get(response.status_code, "llm_request_rejected"),
+                    )
                 retry_after = response.headers.get("retry-after")
                 reason = f"status {response.status_code}"
             except (httpx.TimeoutException, httpx.TransportError) as exc:
