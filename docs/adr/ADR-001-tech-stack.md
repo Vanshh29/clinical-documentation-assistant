@@ -13,7 +13,7 @@ The project is a clinical documentation assistant: free-text notes become struct
 | Backend | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2 + Alembic | Pydantic doubles as LLM output validation and API contract |
 | Database | PostgreSQL 16 | Transactional workflow state, append-only audit table, JSONB for summaries |
 | Messaging | Kafka API (Redpanda locally) | Decouples intake from slow LLM processing; replayable |
-| LLM | Anthropic behind an `LLMProvider` port, plus `FakeProvider` | Vendor isolation; offline demo and deterministic tests |
+| LLM | A hosted model API (OpenRouter) behind an `LLMProvider` port, plus `FakeProvider` | Vendor isolation; offline demo and deterministic tests |
 | PII | Presidio (DE + EN) + custom German regex recognizers | Redaction happens before any LLM call |
 | Infra | Docker, Compose, Terraform, Helm, ArgoCD, GitHub Actions | GitOps delivery |
 | Observability | JSON logs, OpenTelemetry, Prometheus | Standard triad |

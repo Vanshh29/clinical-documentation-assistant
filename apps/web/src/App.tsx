@@ -51,5 +51,7 @@ const router = createBrowserRouter([
 ]);
 
 export function App() {
-  return <RouterProvider router={router} />;
+  // Route changes commit immediately. The default transition wrapping left the old page on screen
+  // after the URL changed (notably leaving a note that had just been approved).
+  return <RouterProvider router={router} useTransitions={false} />;
 }

@@ -1,4 +1,4 @@
-"""LLM provider for OpenRouter's OpenAI-compatible chat completions API.
+"""LLM provider for OpenRouter's chat-completions API.
 
 Exponential backoff with full jitter on 429/5xx and transport errors, bounded retries, timeouts.
 Never logs prompts or note text.

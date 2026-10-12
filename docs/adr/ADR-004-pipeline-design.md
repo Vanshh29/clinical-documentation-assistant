@@ -12,7 +12,7 @@
 6. **Transport resilience.** Exponential backoff with full jitter on 429/5xx and timeouts (honouring `Retry-After`), then a circuit breaker so an outage fails fast instead of stalling the queue.
 7. **Input limit.** Tokens are estimated at 4 characters each. Over-long notes are cut at the last sentence boundary within budget; a prefix keeps span offsets valid.
 8. **Delivery.** Transactional outbox -> relay -> Kafka (`SKIP LOCKED`, at-least-once). The consumer commits offsets after handling and the processor is idempotent (state and generation checks), so redelivery is harmless. A reaper fails notes left in `PROCESSING` by a crashed worker.
-9. **Provider.** `OpenRouterProvider` (OpenAI-compatible API) and an offline `FakeProvider` behind one `LLMProvider` port. An Anthropic provider can be added without touching the pipeline.
+9. **Provider.** `OpenRouterProvider` and an offline `FakeProvider` sit behind one `LLMProvider` port. Further providers can be added without touching the pipeline.
 
 ## Known trade-offs
 - The worker imports the API package for models and state transitions. This avoids duplicating the schema, at the cost of coupled releases; extracting a shared `cda-core` package is the next step if the services diverge.
