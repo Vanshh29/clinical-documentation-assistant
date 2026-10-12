@@ -11,7 +11,7 @@ async function signIn(page: Page, email: string) {
 
 test('clinician submits a note, reviews the summary, edits and approves it', async ({ page }) => {
   await signIn(page, 'clinician1@demo.example');
-  await expect(page.getByRole('heading', { name: 'Notes' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Notes', exact: true })).toBeVisible();
 
   await page.getByRole('link', { name: 'New note' }).first().click();
   await page.getByRole('button', { name: /English example/ }).click();

@@ -261,3 +261,25 @@ async def test_processing_updates_prometheus_metrics(
     assert val("cda_worker_llm_tokens_total", {"direction": "input"}) > tokens_before
     assert val("cda_worker_redactions_total", {"type": "PERSON"}) > redacted_before
     assert val("cda_worker_note_duration_seconds_count") >= 1
+
+
+async def test_reaper_survives_a_failing_pass_so_the_heartbeat_keeps_running(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import asyncio
+
+    from cda_worker import main as worker_main
+
+    calls = {"n": 0}
+
+    async def flaky(processor: object, older_than: object) -> None:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ConnectionRefusedError("database starting")
+
+    monkeypatch.setattr(worker_main, "reap_stuck", flaky)
+    task = asyncio.create_task(
+        worker_main.run_reaper(object(), timedelta(minutes=1), interval=0.01)
+    )  # type: ignore[arg-type]
+    await asyncio.sleep(0.15)
+    assert not task.done()  # a crashed reaper would stop the heartbeat and restart the pod
+    assert calls["n"] >= 2
+    task.cancel()

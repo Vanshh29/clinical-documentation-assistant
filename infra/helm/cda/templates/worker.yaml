@@ -43,6 +43,7 @@ spec:
           startupProbe:
             exec: { command: ["python", "-m", "cda_worker.health"] }
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 30
           livenessProbe:
             exec: { command: ["python", "-m", "cda_worker.health"] }

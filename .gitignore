@@ -56,3 +56,4 @@ eval/results/
 # Terraform
 infra/terraform/environments/*.backend.hcl
 .tflint.d/
+.kind-bin/

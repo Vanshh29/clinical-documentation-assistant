@@ -87,6 +87,18 @@ async def prepare_topics(settings: WorkerSettings, attempts: int = 10) -> None:
             await asyncio.sleep(min(2**attempt, 15))
 
 
+async def run_reaper(
+    processor: NoteProcessor, older_than: timedelta, interval: float = 60.0
+) -> None:
+    """Never let a transient database error end this task: its death would stop the heartbeat."""
+    while True:
+        try:
+            await reap_stuck(processor, older_than)
+        except Exception:
+            log.exception("reaper pass failed; will retry")
+        await asyncio.sleep(interval)
+
+
 async def run() -> None:
     settings = get_settings()
     configure_logging(settings.log_level)
@@ -127,15 +139,10 @@ async def run() -> None:
     await producer.start()
     await consumer.start()
 
-    async def reaper() -> None:
-        while True:
-            await reap_stuck(processor, timedelta(minutes=settings.stuck_after_minutes))
-            await asyncio.sleep(60)
-
     tasks = [
         asyncio.create_task(run_relay(factory, producer, settings.outbox_poll_seconds)),
         asyncio.create_task(run_consumer(consumer, handle)),
-        asyncio.create_task(reaper()),
+        asyncio.create_task(run_reaper(processor, timedelta(minutes=settings.stuck_after_minutes))),
     ]
     tasks.append(asyncio.create_task(heartbeat(settings.heartbeat_path, list(tasks))))
     stop = asyncio.Event()
