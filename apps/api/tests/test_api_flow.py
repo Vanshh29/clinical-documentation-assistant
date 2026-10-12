@@ -177,7 +177,7 @@ async def test_regeneration_bumps_generation_and_queues_event(
             .scalars()
             .all()
         )
-    assert len(events) == 2
+    assert sorted(e.topic for e in events) == ["note.submitted", "note.submitted", "summary.ready"]
 
 
 async def test_failed_validation_can_be_retried(client, make_account, session_factory) -> None:  # type: ignore[no-untyped-def]

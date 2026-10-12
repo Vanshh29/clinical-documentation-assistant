@@ -1,21 +1,41 @@
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cda_api.adapters.db.models import Note, Summary
+from cda_api.adapters.crypto import MappingCipher
+from cda_api.adapters.db.models import Note, PiiMapping, Summary
 from cda_api.application import audit
 from cda_api.application.notes import enqueue_note_submitted, get_owned_note
 from cda_api.domain.diff import summary_diff
 from cda_api.domain.enums import AuditAction, NoteStatus
 from cda_api.domain.errors import NotFound, ValidationFailed
 from cda_api.domain.principal import Principal
+from cda_api.domain.redaction_map import RedactionMap
 from cda_api.domain.state_machine import ensure_transition
 from cda_api.domain.summary_schema import ClinicalSummary
 
 
 def current_summary(note: Note) -> Summary | None:
     return note.summaries[-1] if note.summaries else None
+
+
+async def load_redaction_map(
+    session: AsyncSession, note_id: uuid.UUID, cipher: MappingCipher | None
+) -> RedactionMap | None:
+    if cipher is None:
+        return None
+    row = (
+        await session.execute(select(PiiMapping).where(PiiMapping.note_id == note_id))
+    ).scalar_one_or_none()
+    return cipher.decrypt(row.ciphertext) if row else None
+
+
+def display_content(summary: Summary, note: Note, rmap: RedactionMap | None) -> dict[str, Any]:
+    """Model output with real values restored. Only ever returned inside the authenticated UI."""
+    return rmap.rehydrate_summary(summary.content, note.body) if rmap else summary.content
 
 
 def _require_summary(note: Note) -> Summary:
@@ -46,13 +66,20 @@ async def edit_summary(
     return summary
 
 
-async def approve_summary(session: AsyncSession, actor: Principal, note_id: uuid.UUID) -> Summary:
+async def approve_summary(
+    session: AsyncSession,
+    actor: Principal,
+    note_id: uuid.UUID,
+    cipher: MappingCipher | None = None,
+) -> Summary:
     note = await get_owned_note(session, actor, note_id, for_update=True)
     summary = _require_summary(note)
     note.status = ensure_transition(NoteStatus(note.status), NoteStatus.APPROVED).value
-    final = summary.edited_content or summary.content
+    # Compare in display form so placeholder substitution is not counted as a clinician edit.
+    shown = display_content(summary, note, await load_redaction_map(session, note.id, cipher))
+    final = summary.edited_content or shown
     summary.approved_content = final
-    summary.diff = summary_diff(summary.content, final)
+    summary.diff = summary_diff(shown, final)
     summary.reviewed_by = actor.user_id
     summary.reviewed_at = datetime.now(UTC)
     await audit.record(

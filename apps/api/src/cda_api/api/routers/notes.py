@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Query, status
 
 from cda_api.adapters.db.models import Note
-from cda_api.api.deps import ClinicianDep, SessionDep, SettingsDep
+from cda_api.api.deps import CipherDep, ClinicianDep, SessionDep, SettingsDep
 from cda_api.api.schemas import (
     ErasureResult,
     NoteCreate,
@@ -22,14 +22,16 @@ from cda_api.domain.summary_schema import ClinicalSummary
 router = APIRouter(tags=["notes"])
 
 
-def _detail(note: Note) -> NoteDetail:
+async def _detail(session: SessionDep, note: Note, cipher: CipherDep) -> NoteDetail:
     base = NoteOut.model_validate(note).model_dump()
     current = review.current_summary(note)
-    return NoteDetail(
-        **base,
-        body=note.body,
-        summary=SummaryOut.model_validate(current) if current else None,
-    )
+    summary = None
+    if current:
+        rmap = await review.load_redaction_map(session, note.id, cipher)
+        summary = SummaryOut.model_validate(current).model_copy(
+            update={"content": review.display_content(current, note, rmap)}
+        )
+    return NoteDetail(**base, body=note.body, summary=summary)
 
 
 @router.post("/notes", response_model=NoteOut, status_code=status.HTTP_201_CREATED)
@@ -64,8 +66,11 @@ async def list_notes(
 
 
 @router.get("/notes/{note_id}", response_model=NoteDetail)
-async def get_note(note_id: uuid.UUID, actor: ClinicianDep, session: SessionDep) -> NoteDetail:
-    return _detail(await notes_svc.get_owned_note(session, actor, note_id))
+async def get_note(
+    note_id: uuid.UUID, actor: ClinicianDep, session: SessionDep, cipher: CipherDep
+) -> NoteDetail:
+    note = await notes_svc.get_owned_note(session, actor, note_id)
+    return await _detail(session, note, cipher)
 
 
 @router.put("/notes/{note_id}/summary", response_model=SummaryOut)
@@ -76,8 +81,10 @@ async def edit_summary(
 
 
 @router.post("/notes/{note_id}/approve", response_model=SummaryOut)
-async def approve(note_id: uuid.UUID, actor: ClinicianDep, session: SessionDep) -> SummaryOut:
-    return SummaryOut.model_validate(await review.approve_summary(session, actor, note_id))
+async def approve(
+    note_id: uuid.UUID, actor: ClinicianDep, session: SessionDep, cipher: CipherDep
+) -> SummaryOut:
+    return SummaryOut.model_validate(await review.approve_summary(session, actor, note_id, cipher))
 
 
 @router.post("/notes/{note_id}/reject", response_model=SummaryOut)

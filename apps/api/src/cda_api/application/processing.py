@@ -6,12 +6,14 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cda_api.adapters.db.models import LlmCall, Note, Summary
+from cda_api.adapters.db.models import LlmCall, Note, OutboxEvent, Summary
 from cda_api.application import audit
 from cda_api.domain.enums import AuditAction, NoteStatus
 from cda_api.domain.errors import NotFound
 from cda_api.domain.state_machine import ensure_transition
 from cda_api.domain.summary_schema import SCHEMA_VERSION, ClinicalSummary
+
+TOPIC_SUMMARY_READY = "summary.ready"
 
 
 async def _locked_note(session: AsyncSession, note_id: uuid.UUID) -> Note:
@@ -75,6 +77,17 @@ async def complete_processing(
         )
     )
     await session.flush()
+    session.add(
+        OutboxEvent(
+            topic=TOPIC_SUMMARY_READY,
+            key=str(note.id),
+            payload={
+                "note_id": str(note.id),
+                "summary_id": str(row.id),
+                "generation": row.generation,
+            },
+        )
+    )
     await audit.record(
         session,
         AuditAction.SUMMARY_GENERATED,

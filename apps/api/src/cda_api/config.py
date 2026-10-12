@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     auth_jwt_audience: str = "cda-web"
     auth_access_token_ttl_minutes: int = 30
 
+    # Fernet key for the PII placeholder map. Empty means redaction-dependent features are off.
+    pii_encryption_key: str = ""
+
     max_note_chars: int = 50_000
     retention_days: int = 30
     log_level: str = "INFO"

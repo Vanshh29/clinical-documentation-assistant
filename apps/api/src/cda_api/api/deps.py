@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from cda_api.adapters.crypto import MappingCipher
 from cda_api.adapters.db.session import session_scope
 from cda_api.adapters.security import TokenService
 from cda_api.config import Settings
@@ -58,3 +59,10 @@ def require_clinician(principal: PrincipalDep) -> Principal:
 
 AdminDep = Annotated[Principal, Depends(require_admin)]
 ClinicianDep = Annotated[Principal, Depends(require_clinician)]
+
+
+def get_cipher(settings: SettingsDep) -> MappingCipher | None:
+    return MappingCipher(settings.pii_encryption_key) if settings.pii_encryption_key else None
+
+
+CipherDep = Annotated[MappingCipher | None, Depends(get_cipher)]

@@ -12,10 +12,10 @@ lint:
 	$(PY)/ruff check . && $(PY)/ruff format --check . && $(PY)/mypy
 
 migrate:
-	$(PY)/alembic upgrade head
+	set -a; . ../../.env; set +a; $(PY)/alembic upgrade head
 
 seed:
-	PYTHONPATH=src $(PY)/python -m cda_api.seed
+	set -a; . ../../.env; set +a; PYTHONPATH=src $(PY)/python -m cda_api.seed
 
 run:
-	PYTHONPATH=src $(PY)/uvicorn cda_api.main:app_factory --factory --reload --port 8000
+	set -a; . ../../.env; set +a; PYTHONPATH=src $(PY)/uvicorn cda_api.main:app_factory --factory --reload --port 8000
