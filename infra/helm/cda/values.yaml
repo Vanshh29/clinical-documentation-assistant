@@ -1,0 +1,114 @@
+# Defaults are safe and minimal. Per-environment overrides live in values-dev.yaml / values-prod.yaml.
+# Demo only. Not a medical device. Not for real patient data.
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Image tags are immutable and set by CI in the values-<env>.yaml files (never "latest").
+imagePullPolicy: IfNotPresent
+imagePullSecrets: []
+images:
+  api: { repository: REGISTRY/cda-api, tag: "" }
+  worker: { repository: REGISTRY/cda-worker, tag: "" }
+  web: { repository: REGISTRY/cda-web, tag: "" }
+
+# Non-secret settings, rendered into a ConfigMap.
+config:
+  logLevel: INFO
+  authIssuer: https://cda.example.com
+  authAudience: cda-web
+  llmProvider: fake # fake | openrouter
+  llmModel: ""
+  llmMaxInputTokens: 8000
+  llmMaxValidationRetries: 2
+  retentionDays: 30
+  kafkaBootstrapServers: ""
+  kafkaTopicPartitions: 3
+  kafkaReplicationFactor: 1
+  otlpEndpoint: ""
+
+# Secrets are never in git. The chart reads an existing Secret with these keys:
+#   DATABASE_URL, PII_ENCRYPTION_KEY, AUTH_JWT_SECRET, OPENROUTER_API_KEY (optional)
+secrets:
+  existingSecret: cda-secrets
+  create: false # local clusters only: creates the Secret from `secrets.values` (pass with --set)
+  values: {}
+
+# Production: sync the Secret from AWS Secrets Manager with External Secrets Operator.
+externalSecrets:
+  enabled: false
+  refreshInterval: 1h
+  secretStoreRef: { name: aws-secrets-manager, kind: ClusterSecretStore }
+  remoteRefs: # name of the Secrets Manager secret (JSON) and the property for each key
+    DATABASE_URL: { key: cda/app, property: database_url }
+    PII_ENCRYPTION_KEY: { key: cda/app, property: pii_encryption_key }
+    AUTH_JWT_SECRET: { key: cda/app, property: auth_jwt_secret }
+    OPENROUTER_API_KEY: { key: cda/app, property: openrouter_api_key }
+
+serviceAccount:
+  create: true
+  annotations: {} # e.g. eks.amazonaws.com/role-arn for IRSA
+
+podSecurity:
+  uid: 10001 # api and worker images
+  webUid: 101 # nginx-unprivileged
+
+api:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 192Mi }
+    limits: { memory: 512Mi }
+  hpa: { enabled: true, minReplicas: 2, maxReplicas: 6, targetCPUUtilizationPercentage: 70 }
+  pdb: { enabled: true, minAvailable: 1 }
+
+worker:
+  replicas: 1
+  resources:
+    requests: { cpu: 250m, memory: 768Mi }
+    limits: { memory: 1536Mi }
+  # Consumers beyond the topic's partition count sit idle: keep maxReplicas <= kafkaTopicPartitions.
+  hpa: { enabled: false, minReplicas: 1, maxReplicas: 3, targetCPUUtilizationPercentage: 75 }
+  pdb: { enabled: false, maxUnavailable: 1 }
+
+web:
+  replicas: 2
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits: { memory: 96Mi }
+  hpa: { enabled: true, minReplicas: 2, maxReplicas: 4, targetCPUUtilizationPercentage: 70 }
+  pdb: { enabled: true, minAvailable: 1 }
+
+ingress:
+  enabled: true
+  className: nginx
+  host: cda.example.com
+  annotations: {}
+  tls: { enabled: true, secretName: cda-tls }
+
+networkPolicy:
+  enabled: true
+  ingressNamespace: ingress-nginx # namespace of the ingress controller
+  monitoringNamespace: monitoring # namespace of Prometheus
+  databaseCidr: 10.0.0.0/16 # where Postgres (RDS) lives
+  kafkaCidr: 10.0.0.0/16 # where the Kafka brokers live
+  llmEgress: true # worker may reach the model API over HTTPS (443)
+
+monitoring:
+  serviceMonitor: { enabled: false, interval: 30s } # needs the Prometheus Operator CRDs
+
+migrations:
+  enabled: true
+
+retention:
+  enabled: true
+  schedule: "0 3 * * *"
+
+# Creates the three demo users. Dev only: production must use a real identity provider (ADR-002).
+demoUsers:
+  enabled: false
+
+# Single-node Postgres and Redpanda for local clusters (kind) and cheap dev. Not for production.
+devInfra:
+  enabled: false
+  postgres: { image: "postgres:16.4-alpine", storage: 2Gi, database: cda, user: cda }
+  redpanda: { image: "docker.redpanda.com/redpandadata/redpanda:v24.2.7", storage: 2Gi }

@@ -1,0 +1,28 @@
+# Dev follows main automatically. CI commits new image tags into values-dev.yaml and ArgoCD rolls them out.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cda-dev
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: cda
+  source:
+    repoURL: https://github.com/OWNER/clinical-documentation-assistant.git
+    targetRevision: main
+    path: infra/helm/cda
+    helm:
+      releaseName: cda
+      valueFiles: [values-dev.yaml]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cda-dev
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true, PruneLast=true, ServerSideApply=true]
+    retry:
+      limit: 3
+      backoff: { duration: 15s, factor: 2, maxDuration: 3m }
+  ignoreDifferences:
+    # The autoscaler owns replica counts.
+    - { group: apps, kind: Deployment, jsonPointers: [/spec/replicas] }

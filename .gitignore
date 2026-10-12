@@ -50,3 +50,9 @@ CLAUDE.md
 
 # Evaluation run artifacts (the committed report is docs/eval-report.md)
 eval/results/
+.tf-plugin-cache/
+.render/
+
+# Terraform
+infra/terraform/environments/*.backend.hcl
+.tflint.d/

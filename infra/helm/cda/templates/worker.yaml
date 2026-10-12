@@ -1,0 +1,98 @@
+{{- $c := dict "root" . "component" "worker" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cda.fullname" . }}-worker
+  labels: {{- include "cda.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  {{- if not .Values.worker.hpa.enabled }}
+  replicas: {{ .Values.worker.replicas }}
+  {{- end }}
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels: {{- include "cda.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "cda.selector" $c | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "cda.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      securityContext: {{- include "cda.podSecurityContext" (dict "uid" .Values.podSecurity.uid) | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # In-flight notes finish; anything unfinished is picked up again (idempotent processing).
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: worker
+          image: {{ include "cda.image" (dict "image" .Values.images.worker "name" "worker") }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          envFrom: {{- include "cda.appEnvFrom" . | nindent 12 }}
+          env: {{- include "cda.appEnvVars" . | nindent 12 }}
+            - name: OPENROUTER_API_KEY
+              valueFrom: { secretKeyRef: { name: {{ include "cda.secretName" . }}, key: OPENROUTER_API_KEY, optional: true } }
+          ports:
+            - { name: metrics, containerPort: 9100 }
+          # Heartbeat file is written only while consumer, relay and reaper are all alive.
+          startupProbe:
+            exec: { command: ["python", "-m", "cda_worker.health"] }
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            exec: { command: ["python", "-m", "cda_worker.health"] }
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources: {{- toYaml .Values.worker.resources | nindent 12 }}
+          securityContext: {{- include "cda.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: { sizeLimit: 64Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cda.fullname" . }}-worker
+  labels: {{- include "cda.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  type: ClusterIP
+  selector: {{- include "cda.selector" $c | nindent 4 }}
+  ports:
+    - { name: metrics, port: 9100, targetPort: metrics }
+{{- if .Values.worker.hpa.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "cda.fullname" . }}-worker
+  labels: {{- include "cda.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: {{ include "cda.fullname" . }}-worker }
+  minReplicas: {{ .Values.worker.hpa.minReplicas }}
+  maxReplicas: {{ .Values.worker.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: {{ .Values.worker.hpa.targetCPUUtilizationPercentage }} }
+{{- end }}
+{{- if .Values.worker.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "cda.fullname" . }}-worker
+  labels: {{- include "cda.labels" . | nindent 4 }}
+spec:
+  maxUnavailable: {{ .Values.worker.pdb.maxUnavailable }}
+  selector:
+    matchLabels: {{- include "cda.selector" $c | nindent 6 }}
+{{- end }}

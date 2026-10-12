@@ -1,0 +1,96 @@
+name: deploy
+
+# Builds, scans and pushes images for a commit on main, then commits the new tag to the dev GitOps values.
+# ArgoCD (automated sync) rolls dev out from that commit. Prod is promoted by hand (promote-prod.yml).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # GitHub OIDC -> AWS, no stored keys
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+env:
+  TAG: sha-${{ github.sha }}
+
+jobs:
+  configured:
+    runs-on: ubuntu-24.04
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          ROLE: ${{ vars.AWS_ROLE_ARN }}
+          REGISTRY: ${{ vars.ECR_REGISTRY }}
+        run: |
+          if [ -n "$ROLE" ] && [ -n "$REGISTRY" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
+          else echo "AWS_ROLE_ARN / ECR_REGISTRY not set: skipping deploy" ; echo "ready=false" >> "$GITHUB_OUTPUT"; fi
+
+  build-push:
+    needs: configured
+    if: needs.configured.outputs.ready == 'true'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: true
+      matrix:
+        component: [api, worker, web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.component }}/Dockerfile
+          load: true
+          push: false
+          tags: ${{ vars.ECR_REGISTRY }}/cda-${{ matrix.component }}:${{ env.TAG }}
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+      - name: Scan before pushing
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ vars.ECR_REGISTRY }}/cda-${{ matrix.component }}:${{ env.TAG }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Push (tags are immutable in ECR)
+        run: docker push "${{ vars.ECR_REGISTRY }}/cda-${{ matrix.component }}:${{ env.TAG }}"
+
+  update-dev:
+    needs: build-push
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Point dev at the new images
+        run: |
+          for c in api worker web; do
+            yq -i ".images.$c.repository = \"${{ vars.ECR_REGISTRY }}/cda-$c\" | .images.$c.tag = \"$TAG\"" infra/helm/cda/values-dev.yaml
+          done
+      - name: Commit the new tag for ArgoCD to pick up
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add infra/helm/cda/values-dev.yaml
+          git diff --cached --quiet && { echo "dev already on $TAG"; exit 0; }
+          git commit -m "chore(deploy): dev images ${TAG}"
+          git push origin HEAD:main

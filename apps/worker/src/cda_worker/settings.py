@@ -11,6 +11,8 @@ class WorkerSettings(BaseSettings):
     kafka_bootstrap_servers: str = "localhost:19092"
     kafka_topic_note_submitted: str = "note.submitted"
     kafka_group_id: str = "cda-worker"
+    kafka_topic_partitions: int = 3  # 0 disables topic creation (managed by the platform)
+    kafka_replication_factor: int = 1
 
     pii_encryption_key: str = ""
 

@@ -1,0 +1,158 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $np := .Values.networkPolicy }}
+# Default deny for every pod of this release, then open only what each component needs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "cda.fullname" . }}-default-deny
+  labels: {{- include "cda.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "cda.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "cda.fullname" . }}-web
+  labels: {{- include "cda.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "cda.selector" (dict "root" . "component" "web") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $np.ingressNamespace }} }
+      ports: [{ port: 8080, protocol: TCP }]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {{- include "cda.selector" (dict "root" . "component" "api") | nindent 14 }}
+      ports: [{ port: 8000, protocol: TCP }]
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "cda.fullname" . }}-api
+  labels: {{- include "cda.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "cda.selector" (dict "root" . "component" "api") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {{- include "cda.selector" (dict "root" . "component" "web") | nindent 14 }}
+      ports: [{ port: 8000, protocol: TCP }]
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $np.monitoringNamespace }} }
+      ports: [{ port: 9100, protocol: TCP }]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+    - to:
+        - ipBlock: { cidr: {{ $np.databaseCidr }} }
+        {{- if .Values.devInfra.enabled }}
+        - podSelector:
+            matchLabels: {{- include "cda.selector" (dict "root" . "component" "postgres") | nindent 14 }}
+        {{- end }}
+      ports: [{ port: 5432, protocol: TCP }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "cda.fullname" . }}-worker
+  labels: {{- include "cda.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "cda.selector" (dict "root" . "component" "worker") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $np.monitoringNamespace }} }
+      ports: [{ port: 9100, protocol: TCP }]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+    - to:
+        - ipBlock: { cidr: {{ $np.databaseCidr }} }
+        {{- if .Values.devInfra.enabled }}
+        - podSelector:
+            matchLabels: {{- include "cda.selector" (dict "root" . "component" "postgres") | nindent 14 }}
+        {{- end }}
+      ports: [{ port: 5432, protocol: TCP }]
+    - to:
+        - ipBlock: { cidr: {{ $np.kafkaCidr }} }
+        {{- if .Values.devInfra.enabled }}
+        - podSelector:
+            matchLabels: {{- include "cda.selector" (dict "root" . "component" "redpanda") | nindent 14 }}
+        {{- end }}
+      ports: [{ port: 9092, protocol: TCP }]
+    {{- if $np.llmEgress }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16]
+      ports: [{ port: 443, protocol: TCP }]
+    {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "cda.fullname" . }}-jobs
+  labels: {{- include "cda.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "cda.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: job
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+    - to:
+        - ipBlock: { cidr: {{ $np.databaseCidr }} }
+        {{- if .Values.devInfra.enabled }}
+        - podSelector:
+            matchLabels: {{- include "cda.selector" (dict "root" . "component" "postgres") | nindent 14 }}
+        {{- end }}
+      ports: [{ port: 5432, protocol: TCP }]
+{{- if .Values.devInfra.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "cda.fullname" . }}-devinfra
+  labels: {{- include "cda.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "cda.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+    matchExpressions:
+      - { key: app.kubernetes.io/component, operator: In, values: [postgres, redpanda] }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - { key: app.kubernetes.io/component, operator: In, values: [api, worker, job, redpanda] }
+      ports: [{ port: 5432, protocol: TCP }, { port: 9092, protocol: TCP }]
+{{- end }}
+{{- end }}

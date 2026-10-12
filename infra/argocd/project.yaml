@@ -1,0 +1,20 @@
+# Limits what this project's applications may deploy and where.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: cda
+  namespace: argocd
+spec:
+  description: Clinical Documentation Assistant (demo only)
+  sourceRepos:
+    - https://github.com/OWNER/clinical-documentation-assistant.git # set to your repository
+  destinations:
+    - { server: https://kubernetes.default.svc, namespace: cda-dev }
+    - { server: https://kubernetes.default.svc, namespace: cda-prod }
+  # No cluster-scoped resources: the chart only creates namespaced objects.
+  clusterResourceWhitelist: []
+  namespaceResourceBlacklist:
+    - { group: "", kind: ResourceQuota }
+    - { group: "", kind: LimitRange }
+  orphanedResources:
+    warn: true

@@ -1,0 +1,25 @@
+# Prod is synced by hand: there is no `automated` block, so a merge to main never reaches it on its own.
+# Promote by updating values-prod.yaml (see .github/workflows/promote-prod.yml), review the diff in
+# ArgoCD, then press Sync (or `argocd app sync cda-prod`).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cda-prod
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: cda
+  source:
+    repoURL: https://github.com/OWNER/clinical-documentation-assistant.git
+    targetRevision: main
+    path: infra/helm/cda
+    helm:
+      releaseName: cda
+      valueFiles: [values-prod.yaml]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cda-prod
+  syncPolicy:
+    syncOptions: [CreateNamespace=true, PruneLast=true, ServerSideApply=true]
+  ignoreDifferences:
+    - { group: apps, kind: Deployment, jsonPointers: [/spec/replicas] }

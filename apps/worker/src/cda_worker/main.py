@@ -19,6 +19,7 @@ from cda_worker.adapters.fake_provider import FakeProvider
 from cda_worker.adapters.kafka import run_consumer, run_relay
 from cda_worker.adapters.openrouter_provider import OpenRouterProvider
 from cda_worker.adapters.redactor import PresidioRedactor
+from cda_worker.admin_topics import ensure_topics
 from cda_worker.domain.ports import LLMProvider
 from cda_worker.domain.prompts import PromptBuilder
 from cda_worker.health import heartbeat
@@ -66,6 +67,26 @@ async def reap_stuck(processor: NoteProcessor, older_than: timedelta) -> None:
         await processor.fail_unexpected(note_id, FAILURE_STUCK)
 
 
+async def prepare_topics(settings: WorkerSettings, attempts: int = 10) -> None:
+    """Create the topics with enough partitions to scale consumers. Waits for the broker."""
+    if settings.kafka_topic_partitions <= 0:
+        return
+    for attempt in range(1, attempts + 1):
+        try:
+            created = await ensure_topics(
+                settings.kafka_bootstrap_servers,
+                settings.kafka_topic_partitions,
+                settings.kafka_replication_factor,
+            )
+            log.info("topics ready", extra={"ctx": {"created": created}})
+            return
+        except Exception:
+            log.warning("broker not ready for topic setup", extra={"ctx": {"attempt": attempt}})
+            if attempt == attempts:
+                raise
+            await asyncio.sleep(min(2**attempt, 15))
+
+
 async def run() -> None:
     settings = get_settings()
     configure_logging(settings.log_level)
@@ -102,6 +123,7 @@ async def run() -> None:
         auto_offset_reset="earliest",
     )
     start_http_server(settings.metrics_port)
+    await prepare_topics(settings)
     await producer.start()
     await consumer.start()
 

@@ -1,0 +1,6 @@
+# cp environments/prod.backend.hcl.example environments/dev.backend.hcl  (the real file is git-ignored)
+bucket         = "cda-tfstate-123456789012"
+key            = "cda/prod/terraform.tfstate"
+region         = "eu-central-1"
+dynamodb_table = "cda-tfstate-lock"
+encrypt        = true

@@ -1,0 +1,128 @@
+{{- if .Values.devInfra.enabled }}
+# Single-node Postgres and Redpanda for local clusters and cheap dev. Not highly available; not for prod.
+{{- $pg := dict "root" . "component" "postgres" }}
+{{- $rp := dict "root" . "component" "redpanda" }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "cda.fullname" . }}-postgres
+  labels: {{- include "cda.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  serviceName: {{ include "cda.fullname" . }}-postgres
+  replicas: 1
+  selector:
+    matchLabels: {{- include "cda.selector" $pg | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "cda.selector" $pg | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: postgres
+          image: {{ .Values.devInfra.postgres.image }}
+          env:
+            - { name: POSTGRES_DB, value: {{ .Values.devInfra.postgres.database | quote }} }
+            - { name: POSTGRES_USER, value: {{ .Values.devInfra.postgres.user | quote }} }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "cda.secretName" . }}, key: POSTGRES_PASSWORD } }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          ports: [{ name: postgres, containerPort: 5432 }]
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", {{ .Values.devInfra.postgres.user | quote }}] }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          securityContext: {{- include "cda.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+            - { name: run, mountPath: /var/run/postgresql }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: run, emptyDir: {} }
+        - { name: tmp, emptyDir: {} }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: {{ .Values.devInfra.postgres.storage }} } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cda.fullname" . }}-postgres
+  labels: {{- include "cda.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  selector: {{- include "cda.selector" $pg | nindent 4 }}
+  ports: [{ name: postgres, port: 5432, targetPort: postgres }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "cda.fullname" . }}-redpanda
+  labels: {{- include "cda.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redpanda
+spec:
+  serviceName: {{ include "cda.fullname" . }}-redpanda
+  replicas: 1
+  selector:
+    matchLabels: {{- include "cda.selector" $rp | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "cda.selector" $rp | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: redpanda
+          image: {{ .Values.devInfra.redpanda.image }}
+          args:
+            - redpanda
+            - start
+            - --smp=1
+            - --memory=512M
+            - --overprovisioned
+            - --mode=dev-container
+            - --kafka-addr=internal://0.0.0.0:9092
+            - --advertise-kafka-addr=internal://{{ include "cda.fullname" . }}-redpanda:9092
+          ports: [{ name: kafka, containerPort: 9092 }]
+          readinessProbe:
+            tcpSocket: { port: kafka }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 100m, memory: 640Mi }
+            limits: { memory: 1Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/redpanda/data }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: {{ .Values.devInfra.redpanda.storage }} } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cda.fullname" . }}-redpanda
+  labels: {{- include "cda.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redpanda
+spec:
+  selector: {{- include "cda.selector" $rp | nindent 4 }}
+  ports: [{ name: kafka, port: 9092, targetPort: kafka }]
+{{- end }}

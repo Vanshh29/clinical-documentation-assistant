@@ -1,0 +1,20 @@
+# Dev environment: tracks main automatically (ArgoCD auto-sync + self-heal).
+images:
+  api: { repository: REGISTRY/cda-api, tag: "0.1.0" }
+  worker: { repository: REGISTRY/cda-worker, tag: "0.1.0" }
+  web: { repository: REGISTRY/cda-web, tag: "0.1.0" }
+
+config:
+  authIssuer: https://dev.cda.example.com
+  kafkaBootstrapServers: "" # empty: use the in-cluster Redpanda from devInfra
+
+api: { replicas: 1, hpa: { enabled: false } }
+web: { replicas: 1, hpa: { enabled: false } }
+
+ingress:
+  host: dev.cda.example.com
+  tls: { enabled: true, secretName: cda-dev-tls }
+
+demoUsers: { enabled: true }
+devInfra: { enabled: true }
+externalSecrets: { enabled: false }

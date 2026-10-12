@@ -1,0 +1,19 @@
+# App of apps: apply this one manifest (kubectl apply -n argocd -f infra/argocd/root-app.yaml) and
+# ArgoCD creates and keeps the dev and prod applications in apps/ in sync.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cda-root
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: cda
+  source:
+    repoURL: https://github.com/OWNER/clinical-documentation-assistant.git
+    targetRevision: main
+    path: infra/argocd/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }

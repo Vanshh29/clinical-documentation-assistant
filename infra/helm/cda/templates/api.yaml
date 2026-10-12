@@ -1,0 +1,110 @@
+{{- $c := dict "root" . "component" "api" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cda.fullname" . }}-api
+  labels: {{- include "cda.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  {{- if not .Values.api.hpa.enabled }}
+  replicas: {{ .Values.api.replicas }}
+  {{- end }}
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels: {{- include "cda.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "cda.selector" $c | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "cda.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      securityContext: {{- include "cda.podSecurityContext" (dict "uid" .Values.podSecurity.uid) | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 30
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: {{- include "cda.selector" $c | nindent 20 }}
+      containers:
+        - name: api
+          image: {{ include "cda.image" (dict "image" .Values.images.api "name" "api") }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          envFrom: {{- include "cda.appEnvFrom" . | nindent 12 }}
+          env: {{- include "cda.appEnvVars" . | nindent 12 }}
+          ports:
+            - { name: http, containerPort: 8000 }
+            - { name: metrics, containerPort: 9100 }
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 3
+            failureThreshold: 20
+          resources: {{- toYaml .Values.api.resources | nindent 12 }}
+          securityContext: {{- include "cda.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: { sizeLimit: 64Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cda.fullname" . }}-api
+  labels: {{- include "cda.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  selector: {{- include "cda.selector" $c | nindent 4 }}
+  ports:
+    - { name: http, port: 8000, targetPort: http }
+    - { name: metrics, port: 9100, targetPort: metrics }
+{{- if .Values.api.hpa.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "cda.fullname" . }}-api
+  labels: {{- include "cda.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: {{ include "cda.fullname" . }}-api }
+  minReplicas: {{ .Values.api.hpa.minReplicas }}
+  maxReplicas: {{ .Values.api.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: {{ .Values.api.hpa.targetCPUUtilizationPercentage }} }
+{{- end }}
+{{- if .Values.api.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "cda.fullname" . }}-api
+  labels: {{- include "cda.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.api.pdb.minAvailable }}
+  selector:
+    matchLabels: {{- include "cda.selector" $c | nindent 6 }}
+{{- end }}

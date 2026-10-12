@@ -1,0 +1,55 @@
+name: promote-prod
+
+# Opens a pull request that moves prod to an image tag already running in dev. Merging the PR does NOT
+# deploy: an operator then reviews the diff in ArgoCD and syncs cda-prod manually.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to promote, e.g. sha-0123456789abcdef"
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Check the image exists for all three components
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$TAG" =~ ^sha-[0-9a-f]{7,40}$ ]] || { echo "tag must look like sha-<commit>"; exit 1; }
+          for c in api worker web; do
+            aws ecr describe-images --repository-name "cda-$c" --image-ids imageTag="$TAG" > /dev/null
+          done
+      - name: Update prod values
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          for c in api worker web; do
+            yq -i ".images.$c.repository = \"${{ vars.ECR_REGISTRY }}/cda-$c\" | .images.$c.tag = \"$TAG\"" infra/helm/cda/values-prod.yaml
+          done
+      - name: Open the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          branch="promote/prod-${TAG}"
+          git checkout -b "$branch"
+          git add infra/helm/cda/values-prod.yaml
+          git commit -m "chore(deploy): promote prod to ${TAG}"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "Promote prod to ${TAG}" \
+            --body "Moves prod to \`${TAG}\`, which has been running in dev. After merging, review the diff in ArgoCD and sync \`cda-prod\`."
