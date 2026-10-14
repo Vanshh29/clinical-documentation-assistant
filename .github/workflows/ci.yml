@@ -130,7 +130,7 @@ jobs:
       - run: make lint
       - name: Evaluate and gate on regressions
         run: make run
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: eval-report
@@ -269,7 +269,7 @@ jobs:
       - name: Container logs on failure
         if: failure()
         run: docker compose logs --no-color --tail=200
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report
