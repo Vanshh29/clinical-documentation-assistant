@@ -44,7 +44,6 @@ infra/helm/**/charts/*.tgz
 .vscode/
 *.log
 
-
 # Evaluation run artifacts (the committed report is docs/eval-report.md)
 eval/results/
 .tf-plugin-cache/
@@ -54,3 +53,18 @@ eval/results/
 infra/terraform/environments/*.backend.hcl
 .tflint.d/
 .kind-bin/
+
+# Private / local-only: never commit credentials, cluster access or personal notes
+private/
+kubeconfig*
+*.kubeconfig
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+.aws/
+.ssh/
+*.secret
+*.secrets
+credentials.json
+.envrc

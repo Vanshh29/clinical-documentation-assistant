@@ -1,10 +1,34 @@
 version: 2
 updates:
-  - { package-ecosystem: pip, directory: /apps/api, schedule: { interval: weekly } }
-  - { package-ecosystem: pip, directory: /apps/worker, schedule: { interval: weekly } }
-  - { package-ecosystem: npm, directory: /apps/web, schedule: { interval: weekly } }
-  - { package-ecosystem: docker, directory: /apps/api, schedule: { interval: weekly } }
-  - { package-ecosystem: docker, directory: /apps/worker, schedule: { interval: weekly } }
-  - { package-ecosystem: docker, directory: /apps/web, schedule: { interval: weekly } }
-  - { package-ecosystem: terraform, directory: /infra/terraform, schedule: { interval: weekly } }
-  - { package-ecosystem: github-actions, directory: /, schedule: { interval: weekly } }
+  - package-ecosystem: pip
+    directory: /apps/api
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 3
+  - package-ecosystem: pip
+    directory: /apps/worker
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 3
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 3
+  - package-ecosystem: docker
+    directory: /apps/api
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 2
+  - package-ecosystem: docker
+    directory: /apps/worker
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 2
+  - package-ecosystem: docker
+    directory: /apps/web
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 2
+  - package-ecosystem: terraform
+    directory: /infra/terraform
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 2
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 3
