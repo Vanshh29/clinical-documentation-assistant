@@ -116,6 +116,36 @@ async def test_empty_values_need_no_quote(builder: PromptBuilder) -> None:
     assert out.summary is not None
 
 
+async def test_omitted_source_spans_key_on_a_filled_field_is_retried_with_the_exact_format(
+    builder: PromptBuilder,
+) -> None:
+    omitted = valid_payload()
+    omitted["plan"] = {"value": "rest and fluids", "confidence": 0.9}  # no source_spans key at all
+    provider = ScriptedProvider(omitted, valid_payload())
+    out = await run(provider, builder)
+    assert out.summary is not None and out.retries == 1
+    feedback = provider.prompts[1].messages[-1].content
+    assert "plan" in feedback and "exact words copied from the note" in feedback
+
+
+async def test_omitted_source_spans_key_on_an_empty_field_is_accepted(
+    builder: PromptBuilder,
+) -> None:
+    payload = valid_payload()
+    payload["plan"] = {"value": None, "confidence": 0.0}  # nothing to cite, key left out
+    out = await run(ScriptedProvider(payload), builder, retries=0)
+    assert out.summary is not None
+
+
+def test_schema_sent_to_the_model_requires_source_spans_on_every_field() -> None:
+    from cda_worker.domain.llm_output import LlmSummary
+
+    schema = LlmSummary.model_json_schema()
+    field_defs = [d for d in schema["$defs"].values() if "source_spans" in d.get("properties", {})]
+    assert len(field_defs) == 3  # one per value type: text, medications, list of strings
+    assert all("source_spans" in d["required"] for d in field_defs)
+
+
 async def test_retries_are_bounded_then_failed_validation(builder: PromptBuilder) -> None:
     provider = ScriptedProvider({"nonsense": True})
     out = await run(provider, builder, retries=2)

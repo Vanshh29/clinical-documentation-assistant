@@ -8,7 +8,7 @@ from cda_api.domain.summary_schema import (
     Medication,
     SourceSpan,
 )
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 
 class LlmSpan(BaseModel):
@@ -20,7 +20,16 @@ class LlmField[T](BaseModel):
     model_config = ConfigDict(extra="forbid")
     value: T | None = None
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-    source_spans: list[LlmSpan] = Field(default_factory=list)
+    # Required in the schema the model sees: when it was optional, some models left the key out
+    # of every field on some notes. Parsing stays lenient for empty fields (see below).
+    source_spans: list[LlmSpan]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _nothing_to_cite_when_empty(cls, data: object) -> object:
+        if not isinstance(data, dict) or "source_spans" in data:
+            return data
+        return data if _is_filled(data.get("value")) else {**data, "source_spans": []}
 
 
 class LlmSummary(BaseModel):
@@ -54,7 +63,7 @@ def resolve_spans(llm: LlmSummary, note_text: str) -> tuple[ClinicalSummary | No
                 continue
             spans.append(SourceSpan(start=start, end=start + len(quote.text), text=quote.text))
         if _is_filled(field.value) and not spans and not field.source_spans:
-            problems.append(f"{name}: has a value but no source_spans quote from the note")
+            problems.append(f"{name}: {_ADD_QUOTE}")
         resolved[name] = {
             "value": field.value,
             "confidence": field.confidence,
@@ -68,8 +77,21 @@ def resolve_spans(llm: LlmSummary, note_text: str) -> tuple[ClinicalSummary | No
         return None, _describe(exc)
 
 
+_ADD_QUOTE = (
+    "has a value but no quote. Add "
+    '"source_spans": [{"text": "<exact words copied from the note>"}] '
+    "to this field, copying the supporting words verbatim."
+)
+
+
 def _describe(exc: ValidationError) -> list[str]:
-    return [f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in exc.errors(include_input=False)]
+    problems = []
+    for e in exc.errors(include_input=False):
+        loc = ".".join(map(str, e["loc"]))
+        missing_quote = e["type"] == "missing" and e["loc"] and e["loc"][-1] == "source_spans"
+        text = _ADD_QUOTE if missing_quote else e["msg"]
+        problems.append(f"{e['loc'][0] if missing_quote else loc}: {text}")
+    return problems
 
 
 def describe_errors(exc: ValidationError) -> list[str]:
