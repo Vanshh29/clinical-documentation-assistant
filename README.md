@@ -70,7 +70,7 @@ Every figure below came from a run; commands are given so you can reproduce them
 
 **Automated checks (231):** 47 API, 69 worker, 42 web unit, 22 evaluation, 29 Helm policy, 22 browser. Coverage: API 93 %, worker 88 %, web 88 % of lines; domain and application code 93-100 % (spec target 80 %).
 
-**Quality on 33 synthetic German and English notes** (`make eval`; method in [`eval/README.md`](eval/README.md)). The same notes, pipeline and scoring, run with the offline keyword extractor (which gates CI) and with two hosted models, using the current prompt (`v2`):
+**Quality on 33 synthetic German and English notes** (`make eval`; method in [`eval/README.md`](eval/README.md)). The same notes, pipeline and scoring, run with the offline keyword extractor (which gates CI) and with two hosted models, using prompt `v2` (the default is now `v3`, measured below):
 
 | Metric | Offline extractor | DeepSeek V4.1 Flash | Gemma 4 26B |
 |---|---|---|---|
@@ -98,7 +98,22 @@ A third, much larger free reasoning model (NVIDIA Nemotron 3 Ultra 550B) was mea
 | Identifier-heavy notes F1 | 90.9 % -> 95.7 % | 58.8 % -> 95.7 % |
 | History of present illness F1 | 79.3 % -> **50.0 %** | 69.1 % -> **51.1 %** |
 
-So v2 bought reliability, speed, cost and the allergy and identifier fields, but **it made history of present illness worse** on both models; I suspect the prompt's example, which leaves that field empty, nudges models to do the same, but have not tested that. Treat the overall F1 change as small (one note moves a rate by about 3 points). The prompt was refined while looking at these same 33 notes, so the v2 figures are optimistic; a held-out set is the right next step.
+So v2 bought reliability, speed, cost and the allergy and identifier fields, but **it made history of present illness worse** on both models; The next paragraph tests why. Treat the overall F1 change as small (one note moves a rate by about 3 points). The prompt was refined while looking at these same 33 notes, so the v2 figures are optimistic; a held-out set is the right next step.
+
+**Fixing history of present illness (prompt `v3`, DeepSeek only).** `v2` never defined the field and its example left it empty. `v3` defines it (onset, duration, trigger, course), fills it in the example, and says a drug named anywhere in the note, including the plan, belongs in medications. Same notes, same model, three runs of the final prompt (93.2 % F1 each time, against 87.9-88.4 % over three `v2` runs, so the gain is well outside run-to-run noise):
+
+| DeepSeek | v2 | v3 |
+|---|---|---|
+| Overall F1 | 88.4 % | **93.2 %** |
+| History of present illness F1 | 50.0 % | **86.2 %** |
+| Medications F1 | 94.9 % | 97.6 % |
+| Notes with all 7 fields correct | 27.3 % | **54.5 %** |
+| Valid on the first try | 100 % | 100 % |
+| Hallucination / injection success / PII leak | 0.5 % / 0 % / 0 % | 0.5 % / 0 % / 0 % |
+| Overreach (filled a field the note leaves empty) | 7.4 % | 11.1 % |
+| Median / p95 time per note | 9.7 s / 23.8 s | 10.4 s / 27.8 s |
+
+The example did nudge the model, as suspected. The cost: overreach rose from 2 to 3 notes, all arguable rather than invented (a chief complaint also copied into the history, and "ankle sprain" quoted as the assessment when the note says "presents with ankle sprain"). Caveats: only DeepSeek was re-measured, the prompt was tuned while looking at these same 33 notes, and a first v3 attempt that pulled prescribed drugs out of medications was caught and fixed by the same measurement. A held-out set is still needed before trusting the size of the gain. Reproduce: `make -C eval run PROVIDER=openrouter` with `PROMPT_VERSION=v3` ([report](docs/eval-report-deepseek-deepseek-v4.1-flash-prompt-v3.md)).
 
 **What the retry loop does.** Validate-and-retry lifted valid answers from 72.7 % to 97-100 % on the first prompt, and with v2 it is rarely needed. Grounding held on every model: at most 0.6 % of filled values cited text the note did not contain, and no model let a note's injected instructions through.
 
@@ -109,7 +124,7 @@ How far to trust all this: 33 notes, one run per cell, hand-written gold, free a
 **Deployment:** the Helm chart ran on a local Kubernetes cluster and the same browser tests passed against the full stack. Terraform, ArgoCD and the CI workflows are validated and linted but were **not** applied to AWS or run on GitHub: [`docs/deploy.md`](docs/deploy.md#what-has-and-has-not-been-run).
 
 ## Limitations
-- Three hosted models were measured, each once per prompt, on a small hand-written set (above). Prompt `v2` was tuned on that same set, and it lowered history-of-present-illness accuracy; a held-out set would settle both. `make -C eval run PROVIDER=openrouter` measures any hosted model (tokens and cost included); the account needs credit for paid models, otherwise every note fails with `llm_credits_exhausted`.
+- Three hosted models were measured, each once per prompt, on a small hand-written set (above). Prompts `v2` and `v3` were tuned on that same set (`v3` measured on DeepSeek only); a held-out set would settle how much of the gain is real. `make -C eval run PROVIDER=openrouter` measures any hosted model (tokens and cost included); the account needs credit for paid models, otherwise every note fails with `llm_credits_exhausted`.
 - The evaluation set is small (33 notes) and synthetic: one note moves a rate by 3 points.
 - The offline provider is a keyword extractor and is weak on messy notes (31.9 % F1 on abbreviations and fragments).
 - Long notes are cut at the input limit, so facts after the cut are not summarized.
