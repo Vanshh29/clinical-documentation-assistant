@@ -83,6 +83,21 @@ describe('ReviewPage', () => {
     expect(order).toEqual(['PUT /notes/n1/summary', 'POST /notes/n1/approve']);
   });
 
+  it('still reports edits in the approve dialog after the draft was saved', async () => {
+    const edited = summaryFixture();
+    edited.plan.value = 'Rest, fluids and paracetamol.';
+    const base = noteFixture();
+    mockApi({ 'GET /notes/n1': { ...base, summary: { ...base.summary, edited_content: edited } } });
+    open();
+    const user = userEvent.setup();
+    await screen.findByRole('region', { name: 'Plan' });
+    expect(screen.getByText('No unsaved changes')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Approve$/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Approve this summary?' });
+    expect(dialog).toHaveTextContent('1 field(s) changed');
+    expect(dialog).not.toHaveTextContent('approved as generated');
+  });
+
   it('blocks approval and explains when a medication row has no name', async () => {
     const { calls } = mockApi({ 'GET /notes/n1': noteFixture() });
     open();

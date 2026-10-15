@@ -232,8 +232,8 @@ function Workspace({ note, base }: { note: NoteDetail; base: ClinicalSummary }) 
       <Dialog open={dialog === 'approve'} onClose={() => setDialog(null)} title="Approve this summary?">
         <p className="text-sm text-muted">
           Approving makes the summary final and records your edits
-          {isDirty ? ` (${changed} field(s) changed from the generated version)` : ' (none: approved as generated)'}.
-          This cannot be undone.
+          {changed > 0 ? ` (${changed} field(s) changed from the generated version)` : ' (none: approved as generated)'}
+          . This cannot be undone.
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" className="btn btn-ghost" onClick={() => setDialog(null)}>
