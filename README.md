@@ -11,6 +11,13 @@ This app takes a note, removes personal data, asks a model for a structured summ
 
 Original note on the left, editable summary on the right. Selecting a field highlights the text that supports it. Every field shows its confidence and says plainly when something is not documented. Also available: [dark theme](docs/screenshots/review-dark.png) and [phone layout](docs/screenshots/review-mobile.png).
 
+## Demo
+![Demo: a clinician signs in, types a new patient note, reviews the summary, edits and approves it; an administrator then reads the metrics and audit log](docs/media/demo.gif)
+
+A clinician signs in, sees earlier notes, types a new (invented) patient note, reviews the generated summary against the original, edits the plan and approves it. An administrator then signs in and sees the metrics (approved versus still waiting for review) and the audit trail, but no note text.
+
+[Watch the 2-minute video](docs/media/demo.mp4) (MP4, 1.1 MB, real time, typing included). The GIF is a step-by-step slideshow of the same run. Both were recorded against the running app with a hosted model (DeepSeek, prompt `v3`) and synthetic data.
+
 ## Quickstart
 Needs Docker. This builds the images and starts everything (Postgres 16, Redpanda, API, worker, web):
 ```bash
