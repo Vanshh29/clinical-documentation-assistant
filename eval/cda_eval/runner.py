@@ -69,7 +69,7 @@ async def run_variant(
     *,
     max_input_tokens: int = 8000,
     concurrency: int = 1,
-    prompt_version: str = "v2",
+    prompt_version: str = "v3",
 ) -> tuple[RunMetrics, list[dict[str, Any]]]:
     redactor = PresidioRedactor(guard_clinical_terms=variant.guard_clinical_terms)
     builder = PromptBuilder(prompt_version)

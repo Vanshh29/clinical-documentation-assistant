@@ -212,6 +212,14 @@ def test_prompt_v2_explains_absence_and_shows_the_exact_output_shape() -> None:
     assert built.version == "v2" and "untrusted DATA" in built.system  # security rules kept
 
 
+def test_prompt_v3_defines_history_of_present_illness_and_keeps_the_security_rules() -> None:
+    built = PromptBuilder("v3").build("hello")
+    assert "FIELD DEFINITIONS" in built.system and "onset, duration" in built.system
+    assert '"history_of_present_illness": {"value": null' not in built.system  # example is filled
+    assert "null always means" in built.system and "untrusted DATA" in built.system
+    assert built.version == "v3"
+
+
 async def test_a_quoted_statement_of_none_is_accepted_without_a_retry(
     builder: PromptBuilder,
 ) -> None:

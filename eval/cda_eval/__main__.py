@@ -105,8 +105,8 @@ def main() -> None:
     p.add_argument("--concurrency", type=int, default=1)
     p.add_argument(
         "--prompt-version",
-        default=os.environ.get("PROMPT_VERSION", "v2"),
-        help="prompt folder under apps/worker/prompts (default: PROMPT_VERSION or v2)",
+        default=os.environ.get("PROMPT_VERSION", "v3"),
+        help="prompt folder under apps/worker/prompts (default: PROMPT_VERSION or v3)",
     )
     p.add_argument("--check", action="store_true", help="fail if the fixed variant regresses")
     p.add_argument(

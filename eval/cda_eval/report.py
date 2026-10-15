@@ -68,7 +68,7 @@ def render(
     model: str,
     command: str,
     limit: int | None,
-    prompt_version: str = "v2",
+    prompt_version: str = "v3",
 ) -> str:
     fixed = results.get("fixed") or next(iter(results.values()))
     base = results.get("baseline")
