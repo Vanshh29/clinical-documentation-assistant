@@ -55,7 +55,7 @@ A note is saved together with a queued event, so it is never stored without its 
 
 ## Design decisions
 - **Redact before the model.** Presidio plus German and international recognizers replace names, dates of birth, phone, insurance and bank numbers with typed placeholders. The map back is encrypted and kept separately; real values are restored only on screens a signed-in clinician opens. [ADR-004](docs/adr/ADR-004-pipeline-design.md)
-- **The model quotes, the pipeline checks.** Models are poor at counting characters, so they return verbatim quotes and the pipeline finds them in the note. A quote that is not there is rejected and the error is fed back, up to a bound, before the note is marked failed.
+- **The model quotes, the pipeline checks.** Models are poor at counting characters, so they return verbatim quotes and the pipeline finds them in the note. A quote that is not there is rejected, and so is a filled field that has no quote at all; the error is fed back, up to a bound, before the note is marked failed.
 - **Nothing is final without a person.** Edits go to separate columns; the model's output is never overwritten; approval stores a diff that feeds the edit-rate metric. [ADR-003](docs/adr/ADR-003-api-design-decisions.md)
 - **Append-only audit trail, enforced by the database,** holding ids and counts but never note text.
 - **Hexagonal backend.** The domain layer imports no web, broker or model library, so the pipeline runs offline with a deterministic provider and the real one is a drop-in.
@@ -75,7 +75,7 @@ Known gaps: a demo-grade token issuer (replace it with an identity provider befo
 ## Results
 Every figure below came from a run; commands are given so you can reproduce them.
 
-**Automated checks (231):** 47 API, 69 worker, 42 web unit, 22 evaluation, 29 Helm policy, 22 browser. Coverage: API 93 %, worker 88 %, web 88 % of lines; domain and application code 93-100 % (spec target 80 %).
+**Automated checks (247):** 49 API, 81 worker, 44 web unit, 22 evaluation, 29 Helm policy, 22 browser. Coverage: API 93 %, worker 87 %, web 90 % of lines; domain and application code 93-100 % (spec target 80 %).
 
 **Quality on 33 synthetic German and English notes** (`make eval`; method in [`eval/README.md`](eval/README.md)). The same notes, pipeline and scoring, run with the offline keyword extractor (which gates CI) and with two hosted models, using prompt `v2` (the default is now `v3`, measured below):
 
@@ -91,7 +91,7 @@ Every figure below came from a run; commands are given so you can reproduce them
 | Median / p95 time per note | about 0 s | 9.7 s / 23.8 s | **6.3 s / 10.0 s** |
 | Cost per note | none | $0.00031 | **$0.00020** |
 
-A third, much larger free reasoning model (NVIDIA Nemotron 3 Ultra 550B) was measured with the first prompt only: 84.1 % F1, 0.6 % hallucination, 0 % injection, 94 s median per note ([report](docs/eval-report-nvidia-nemotron-3-ultra-550b-a55b-free-prompt-v1.md)). It is slow and its free quota ran out, so it was not re-run. All reports: [`docs/`](docs/) (`eval-report-<model>-prompt-<version>.md`; the offline one is [`docs/eval-report.md`](docs/eval-report.md)). Total spend on all hosted runs was about five cents.
+A third, much larger free reasoning model (NVIDIA Nemotron 3 Ultra 550B) was measured with the first prompt only: 84.1 % F1, 0.6 % hallucination, 0 % injection, 94 s median per note ([report](docs/eval-report-nvidia-nemotron-3-ultra-550b-a55b-free-prompt-v1.md)). It is slow and its free quota ran out, so it was not re-run. All reports: [`docs/`](docs/) (`eval-report-<model>-prompt-<version>.md`; the offline one is [`docs/eval-report.md`](docs/eval-report.md)). Total spend on all hosted runs so far is well under a dollar.
 
 **Measuring a prompt change.** The first prompt left models unsure how to say "the note says there are none" (for example "No medications"), so they quoted the sentence for an empty field, which the schema rejected, and half the first answers needed a retry. Prompt `v2` explains "not mentioned" versus "stated as none" and shows the exact output shape; the schema now accepts a quoted "none". Same notes, same models:
 
@@ -105,7 +105,7 @@ A third, much larger free reasoning model (NVIDIA Nemotron 3 Ultra 550B) was mea
 | Identifier-heavy notes F1 | 90.9 % -> 95.7 % | 58.8 % -> 95.7 % |
 | History of present illness F1 | 79.3 % -> **50.0 %** | 69.1 % -> **51.1 %** |
 
-So v2 bought reliability, speed, cost and the allergy and identifier fields, but **it made history of present illness worse** on both models; The next paragraph tests why. Treat the overall F1 change as small (one note moves a rate by about 3 points). The prompt was refined while looking at these same 33 notes, so the v2 figures are optimistic; a held-out set is the right next step.
+So v2 bought reliability, speed, cost and the allergy and identifier fields, but **it made history of present illness worse** on both models. The next paragraph tests why. Treat the overall F1 change as small (one note moves a rate by about 3 points). The prompt was refined while looking at these same 33 notes, so the v2 figures are optimistic; a held-out set is the right next step.
 
 **Fixing history of present illness (prompt `v3`, DeepSeek only).** `v2` never defined the field and its example left it empty. `v3` defines it (onset, duration, trigger, course), fills it in the example, and says a drug named anywhere in the note, including the plan, belongs in medications. Same notes, same model, three runs of the final prompt (93.2 % F1 each time, against 87.9-88.4 % over three `v2` runs, so the gain is well outside run-to-run noise):
 
@@ -122,16 +122,18 @@ So v2 bought reliability, speed, cost and the allergy and identifier fields, but
 
 The example did nudge the model, as suspected. The cost: overreach rose from 2 to 3 notes, all arguable rather than invented (a chief complaint also copied into the history, and "ankle sprain" quoted as the assessment when the note says "presents with ankle sprain"). Caveats: only DeepSeek was re-measured, the prompt was tuned while looking at these same 33 notes, and a first v3 attempt that pulled prescribed drugs out of medications was caught and fixed by the same measurement. A held-out set is still needed before trusting the size of the gain. Reproduce: `make -C eval run PROVIDER=openrouter` with `PROMPT_VERSION=v3` ([report](docs/eval-report-deepseek-deepseek-v4.1-flash-prompt-v3.md)).
 
+**A later fix, measured again.** Reviewing the demo showed some notes whose summary had values but no source quotes, so the review screen could not highlight the evidence. The pipeline now requires a quote for every filled field, and that requirement is part of the schema the model sees (it had been optional, and on some notes the model left it out of every field). Adding only the rule made 3 of 33 notes fail; with the schema change none do. Final run on the same 33 notes: F1 93.6 %, valid on the first try 100 %, hallucination 0.5 %, injection success 0 %, PII leak 0 %, overreach 3.7 %, median 7.0 s per note, about $0.0020 per note. The cost was higher than the earlier $0.0004 because the hosted endpoint's price varied on the day; compare runs made on the same day. The v3 report linked above is this final run.
+
 **What the retry loop does.** Validate-and-retry lifted valid answers from 72.7 % to 97-100 % on the first prompt, and with v2 it is rarely needed. Grounding held on every model: at most 0.6 % of filled values cited text the note did not contain, and no model let a note's injected instructions through.
 
 How far to trust all this: 33 notes, one run per cell, hand-written gold, free and paid endpoints that can change. Compare runs of the same set; do not read the figures as clinical accuracy. The offline column describes the pipeline and the CI gate, not a language model. The redaction guard is measured on its own corpus ([`docs/pii-redaction-report.md`](docs/pii-redaction-report.md)).
 
-**Pipeline speed** (`scripts/load_test.py`, 200 notes, one worker, offline provider, one laptop): every note reached review; median 0.53 s from submit to ready, p95 0.59-0.65 s; 9.7 notes/s at 5 concurrent submitters and 39 notes/s at 20. About half a second of that is the outbox poll interval. With the real reasoning model above the median is 94 s per note, so model time dominates completely. Method and caveats: [`docs/performance.md`](docs/performance.md).
+**Pipeline speed** (`scripts/load_test.py`, 200 notes, one worker, offline provider, one laptop): every note reached review; median 0.53 s from submit to ready, p95 0.59-0.65 s; 9.7 notes/s at 5 concurrent submitters and 39 notes/s at 20. About half a second of that is the outbox poll interval. With a hosted model the median is 6-10 s per note (94 s for the large Nemotron model above), so model time dominates completely. Method and caveats: [`docs/performance.md`](docs/performance.md).
 
 **Deployment:** the Helm chart ran on a local Kubernetes cluster and the same browser tests passed against the full stack. Terraform, ArgoCD and the CI workflows are validated and linted but were **not** applied to AWS or run on GitHub: [`docs/deploy.md`](docs/deploy.md#what-has-and-has-not-been-run).
 
 ## Limitations
-- Three hosted models were measured, each once per prompt, on a small hand-written set (above). Prompts `v2` and `v3` were tuned on that same set (`v3` measured on DeepSeek only); a held-out set would settle how much of the gain is real. `make -C eval run PROVIDER=openrouter` measures any hosted model (tokens and cost included); the account needs credit for paid models, otherwise every note fails with `llm_credits_exhausted`.
+- Three hosted models were measured, each once per prompt, on a small hand-written set (above). Prompts `v2` and `v3` were tuned on that same set (`v3` measured on DeepSeek only); a held-out set would settle how much of the gain is real. `make -C eval run PROVIDER=openrouter` measures any hosted model (tokens and cost included); the account needs credit for paid models, otherwise every note fails with `llm_credits_exhausted`. The API reserves the worst-case cost of each request up front, so on a very small balance lower `LLM_MAX_OUTPUT_TOKENS` (default 8000).
 - The evaluation set is small (33 notes) and synthetic: one note moves a rate by 3 points.
 - The offline provider is a keyword extractor and is weak on messy notes (31.9 % F1 on abbreviations and fragments).
 - Long notes are cut at the input limit, so facts after the cut are not summarized.

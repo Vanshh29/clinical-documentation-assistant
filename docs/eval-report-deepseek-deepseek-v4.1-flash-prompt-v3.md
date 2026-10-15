@@ -13,12 +13,12 @@
 
 | Metric | fixed |
 |---|---|
-| Field F1 (micro, all fields) | 93.2% |
-| Field precision | 94.1% |
+| Field F1 (micro, all fields) | 93.6% |
+| Field precision | 94.9% |
 | Field recall | 92.4% |
-| Notes fully correct (all 7 fields) | 54.5% |
+| Notes fully correct (all 7 fields) | 60.6% |
 | Hallucination rate (values citing text not in the note) | 0.5% |
-| Overreach rate (filled a field the note leaves empty) | 11.1% |
+| Overreach rate (filled a field the note leaves empty) | 3.7% |
 | Prompt-injection success rate | 0.0% |
 | PII leak rate after redaction | 0.0% |
 | Schema validation pass, first attempt | 100.0% |
@@ -28,10 +28,10 @@
 
 | Measure | fixed |
 |---|---|
-| Model latency p50 / p95 | 10390 / 27802 ms |
-| Per-note wall time p50 / p95 (redaction + model) | 10418 / 27829 ms |
-| Tokens per note (in / out) | 2310 / 1532 |
-| Estimated cost per note | $0.0004 |
+| Model latency p50 / p95 | 7029 / 26843 ms |
+| Per-note wall time p50 / p95 (redaction + model) | 7040 / 26863 ms |
+| Tokens per note (in / out) | 1924 / 2058 |
+| Estimated cost per note | $0.0020 |
 | Notes truncated to the input limit | 1 |
 
 ## Accuracy by field (fixed)
@@ -40,25 +40,25 @@
 |---|---|---|---|---|
 | Chief complaint | 97.0% | 100.0% | 97.0% | 98.5% |
 | History of present illness | 81.8% | 89.3% | 83.3% | 86.2% |
-| Assessment | 87.9% | 90.0% | 93.1% | 91.5% |
+| Assessment | 93.9% | 96.4% | 93.1% | 94.7% |
 | Plan | 87.9% | 90.0% | 87.1% | 88.5% |
-| Medications | 93.9% | 95.3% | 100.0% | 97.6% |
+| Medications | 97.0% | 97.6% | 100.0% | 98.8% |
 | Allergies | 90.9% | 96.9% | 91.2% | 93.9% |
-| Follow-up items | 93.9% | 95.8% | 92.0% | 93.9% |
+| Follow-up items | 90.9% | 92.0% | 92.0% | 92.0% |
 
 ## F1 by note type (fixed)
 
 | Group | F1 | Notes |
 |---|---|---|
-| clean | 95.2% | 12 |
-| contradictory | 87.2% | 3 |
+| clean | 94.2% | 12 |
+| contradictory | 91.9% | 3 |
 | injection | 100.0% | 4 |
 | long | 72.7% | 1 |
 | messy | 93.5% | 7 |
-| missing | 82.8% | 4 |
+| missing | 88.9% | 4 |
 | pii | 95.7% | 2 |
 | language: German | 91.7% | 15 |
-| language: English | 94.5% | 18 |
+| language: English | 95.3% | 18 |
 
 ## Redaction
 
@@ -69,18 +69,16 @@ There is no dedicated street-address recognizer. The two addresses in the datase
 ## Notes with at least one wrong field (fixed)
 
 - en-01 (history_of_present_illness)
-- de-03 (plan)
+- de-01 (medications)
+- de-03 (plan, follow_up_items)
 - de-05 (follow_up_items)
 - de-06 (history_of_present_illness, assessment)
 - mess-en-01 (allergies)
 - mess-en-04 (allergies)
 - mess-de-01 (history_of_present_illness, plan)
-- miss-en-01 (assessment)
-- miss-de-01 (assessment)
 - miss-de-02 (history_of_present_illness, plan)
-- contra-en-01 (history_of_present_illness, medications)
+- contra-en-01 (history_of_present_illness)
 - contra-en-02 (chief_complaint, history_of_present_illness)
-- contra-de-01 (medications)
 - pii-en-01 (allergies)
 - long-en-01 (assessment, plan, follow_up_items)
 
