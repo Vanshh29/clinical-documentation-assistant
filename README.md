@@ -16,7 +16,7 @@ Original note on the left, editable summary on the right. Selecting a field high
 
 A clinician signs in, sees earlier notes, types a new (invented) patient note, reviews the generated summary against the original, edits the plan and approves it. An administrator then signs in and sees the metrics (approved versus still waiting for review) and the audit trail, but no note text.
 
-[Watch the 2-minute video](docs/media/demo.mp4) (MP4, 1.1 MB, real time, typing included). The GIF is a step-by-step slideshow of the same run. Both were recorded against the running app with a hosted model (DeepSeek, prompt `v3`) and synthetic data.
+[Watch the 2-minute video on YouTube](https://youtu.be/X4wd8FQaFuo) (real time, typing included; also in the repo as a [1.1 MB MP4](docs/media/demo.mp4)). The GIF is a step-by-step slideshow of the same run. Both were recorded against the running app with a hosted model (DeepSeek, prompt `v3`) and synthetic data.
 
 ## Quickstart
 Needs Docker. This builds the images and starts everything (Postgres 16, Redpanda, API, worker, web):
