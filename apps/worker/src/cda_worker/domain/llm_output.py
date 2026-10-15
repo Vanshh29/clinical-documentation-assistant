@@ -35,6 +35,11 @@ class LlmSummary(BaseModel):
     follow_up_items: LlmField[list[str]]
 
 
+def _is_filled(value: object) -> bool:
+    """A value that says something. null, "" and [] mean 'not documented' or 'stated as none'."""
+    return value not in (None, "", [])
+
+
 def resolve_spans(llm: LlmSummary, note_text: str) -> tuple[ClinicalSummary | None, list[str]]:
     """Locate each quote in the note. Returns the stored-form summary, or the problems found."""
     problems: list[str] = []
@@ -48,6 +53,8 @@ def resolve_spans(llm: LlmSummary, note_text: str) -> tuple[ClinicalSummary | No
                 problems.append(f"{name}: quote not found verbatim in the note: {quote.text!r}")
                 continue
             spans.append(SourceSpan(start=start, end=start + len(quote.text), text=quote.text))
+        if _is_filled(field.value) and not spans and not field.source_spans:
+            problems.append(f"{name}: has a value but no source_spans quote from the note")
         resolved[name] = {
             "value": field.value,
             "confidence": field.confidence,

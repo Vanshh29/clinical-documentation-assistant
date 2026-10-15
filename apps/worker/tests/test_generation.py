@@ -89,6 +89,33 @@ async def test_fabricated_quote_is_rejected(builder: PromptBuilder) -> None:
     assert "not found verbatim" in provider.prompts[1].messages[-1].content
 
 
+async def test_filled_field_without_a_quote_is_rejected_and_retried(builder: PromptBuilder) -> None:
+    uncited = valid_payload()
+    uncited["plan"] = {"value": "rest and fluids", "confidence": 0.9, "source_spans": []}
+    provider = ScriptedProvider(uncited, valid_payload())
+    out = await run(provider, builder)
+    assert out.summary is not None and out.retries == 1
+    assert "plan" in provider.prompts[1].messages[-1].content
+    assert "quote" in provider.prompts[1].messages[-1].content
+
+
+async def test_model_that_never_cites_fails_validation_instead_of_losing_the_evidence(
+    builder: PromptBuilder,
+) -> None:
+    uncited = valid_payload()
+    uncited["allergies"] = {"value": ["no known allergies"], "confidence": 0.9, "source_spans": []}
+    out = await run(ScriptedProvider(uncited), builder, retries=1)
+    assert out.summary is None and out.failure_reason == FAILURE_VALIDATION
+
+
+async def test_empty_values_need_no_quote(builder: PromptBuilder) -> None:
+    payload = valid_payload()
+    payload["medications"] = {"value": [], "confidence": 0.0, "source_spans": []}
+    payload["plan"] = {"value": "", "confidence": 0.0, "source_spans": []}
+    out = await run(ScriptedProvider(payload), builder, retries=0)
+    assert out.summary is not None
+
+
 async def test_retries_are_bounded_then_failed_validation(builder: PromptBuilder) -> None:
     provider = ScriptedProvider({"nonsense": True})
     out = await run(provider, builder, retries=2)
