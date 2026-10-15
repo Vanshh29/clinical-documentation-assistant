@@ -121,7 +121,15 @@ class OpenRouterProvider:
     def _parse(self, response: httpx.Response, started: float, retries: int) -> LLMResult:
         try:
             payload = response.json()
-            content = payload["choices"][0]["message"]["content"]
+            choice = payload["choices"][0]
+            content = choice["message"]["content"]
+            if not isinstance(content, str):
+                # e.g. null content when the output budget ran out before any text was produced
+                log.warning(
+                    "model returned no text content",
+                    extra={"ctx": {"finish_reason": choice.get("finish_reason")}},
+                )
+                raise ValueError("model returned no text content")
             data = json.loads(_FENCE.sub("", content.strip()))
             if not isinstance(data, dict):
                 raise ValueError("model output is not a JSON object")

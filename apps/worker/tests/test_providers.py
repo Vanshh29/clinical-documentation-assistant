@@ -134,6 +134,19 @@ async def test_client_errors_are_not_retried() -> None:
     assert calls["n"] == 1 and not isinstance(err.value, LLMUnavailable)
 
 
+async def test_null_content_becomes_empty_object_instead_of_crashing() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = {
+            "model": "vendor/model-x",
+            "choices": [{"finish_reason": "length", "message": {"content": None}}],
+            "usage": {"prompt_tokens": 120, "completion_tokens": 8000},
+        }
+        return httpx.Response(200, json=body)
+
+    res = await provider(handler, []).generate_structured(PROMPT, LlmSummary)
+    assert res.data == {} and res.output_tokens == 8000
+
+
 async def test_malformed_model_output_becomes_empty_object_for_validation_loop() -> None:
     res = await provider(lambda r: ok_response("sorry, I cannot do that"), []).generate_structured(
         PROMPT, LlmSummary
