@@ -38,6 +38,7 @@ class OpenRouterProvider:
         base_url: str = "https://openrouter.ai/api/v1",
         timeout_seconds: float = 60.0,
         max_retries: int = 3,
+        max_output_tokens: int = 8000,
         backoff_base: float = 1.0,
         backoff_cap: float = 20.0,
         price_in_per_mtok: Decimal = Decimal("0"),
@@ -51,6 +52,7 @@ class OpenRouterProvider:
         self._url = f"{base_url.rstrip('/')}/chat/completions"
         self._headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         self._max_retries = max_retries
+        self._max_output_tokens = max_output_tokens
         self._base, self._cap = backoff_base, backoff_cap
         self._price_in, self._price_out = price_in_per_mtok, price_out_per_mtok
         self._client = client or httpx.AsyncClient(timeout=timeout_seconds)
@@ -60,6 +62,9 @@ class OpenRouterProvider:
         return {
             "model": self._model,
             "temperature": 0,
+            # Without a cap the API reserves the model maximum (131k tokens) and may refuse the
+            # call with 402 even when the real cost would be a fraction of a cent.
+            "max_tokens": self._max_output_tokens,
             "messages": [
                 {"role": "system", "content": prompt.system},
                 *({"role": m.role, "content": m.content} for m in prompt.messages),

@@ -21,6 +21,7 @@ class WorkerSettings(BaseSettings):
     llm_model: str = ""
     llm_timeout_seconds: float = 60.0
     llm_max_input_tokens: int = 8000
+    llm_max_output_tokens: int = 8000
     llm_max_retries: int = 3  # transport retries inside the provider
     llm_max_validation_retries: int = 2  # re-asks with the validation error fed back
     llm_price_in_per_mtok: Decimal = Decimal("0")

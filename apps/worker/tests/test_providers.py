@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 from typing import Any
 
@@ -64,6 +65,18 @@ async def test_request_carries_schema_auth_and_no_secrets_in_body() -> None:
     await provider(handler, []).generate_structured(PROMPT, LlmSummary)
     assert seen["auth"] == "Bearer test-key"
     assert "json_schema" in seen["body"] and "test-key" not in seen["body"]
+
+
+async def test_request_caps_output_tokens_so_the_api_does_not_reserve_the_model_maximum() -> None:
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return ok_response()
+
+    await provider(handler, []).generate_structured(PROMPT, LlmSummary)
+    await provider(handler, [], max_output_tokens=1234).generate_structured(PROMPT, LlmSummary)
+    assert [b["max_tokens"] for b in seen] == [8000, 1234]
 
 
 async def test_retries_429_and_5xx_with_backoff_then_succeeds() -> None:

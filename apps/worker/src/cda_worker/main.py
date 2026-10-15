@@ -41,6 +41,7 @@ def build_provider(settings: WorkerSettings) -> tuple[LLMProvider, str]:
             settings.llm_model,
             timeout_seconds=settings.llm_timeout_seconds,
             max_retries=settings.llm_max_retries,
+            max_output_tokens=settings.llm_max_output_tokens,
             price_in_per_mtok=settings.llm_price_in_per_mtok,
             price_out_per_mtok=settings.llm_price_out_per_mtok,
         )
