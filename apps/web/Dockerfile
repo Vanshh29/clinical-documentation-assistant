@@ -7,7 +7,7 @@ RUN npm ci --no-audit --no-fund
 COPY apps/web/ ./
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.31.6-alpine
+FROM nginxinc/nginx-unprivileged:1.31.7-alpine
 # Unprivileged image: runs as uid 101 and listens on 8080.
 ENV API_UPSTREAM=http://api:8000
 COPY apps/web/nginx.conf.template /etc/nginx/templates/default.conf.template
